@@ -60,6 +60,7 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"enum", TokenType::TOKEN_ENUM},
     {"import", TokenType::TOKEN_IMPORT}, 
     {"extern", TokenType::TOKEN_EXTERN},
+    {"const", TokenType::TOKEN_CONST},
     
     // @object oriented programming
     {"class", TokenType::TOKEN_CLASS},

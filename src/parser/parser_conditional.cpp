@@ -57,7 +57,7 @@ std::unique_ptr<ASTNode> Parser::parseSwitchStmt() {
             consume(TokenType::TOKEN_COLON, "expected ':' after case");
             while (!isAtEnd() && !check(TokenType::TOKEN_CASE) &&
                    !check(TokenType::TOKEN_DEFAULT) && !check(TokenType::TOKEN_RBRACE)) {
-                cb.statements.push_back(parseStatement());
+                for (auto& stmt : parseStatement()) cb.statements.push_back(std::move(stmt));
             }
             sw->cases.push_back(std::move(cb));
         }
@@ -67,7 +67,7 @@ std::unique_ptr<ASTNode> Parser::parseSwitchStmt() {
             sw->hasDefault = true;
 
             while (!isAtEnd() && !check(TokenType::TOKEN_CASE) && !check(TokenType::TOKEN_RBRACE)) {
-                sw->defaultBlock.push_back(parseStatement());
+                for (auto& stmt : parseStatement()) sw->defaultBlock.push_back(std::move(stmt));
             }
         }
         else {
