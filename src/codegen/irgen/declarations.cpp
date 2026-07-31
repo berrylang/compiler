@@ -178,6 +178,16 @@ void CodeGen::genArrayDecl(ASTNode* node, std::ostream& out) {
             llvm.__declareExternFn("i8*", "bery_array_new", {"i64"});
             std::string arrReg = llvm.__emitCall("i8*", "bery_array_new", {{"i64", "4"}}, out);
             llvm.__emitStore("i8*", arrReg, memoryReg, out);
+
+            if (!decl->initializers.empty()) {
+                std::string lt = llvmType(decl->elementType);
+                llvm.__declareExternFn("void", "bery_array_push", {"i8*", "i8*"});
+                for (auto& initVal : decl->initializers) {
+                    std::string valReg = genExpression(initVal.get(), decl->elementType, out);
+                    std::string boxedReg = llvm.__emitBoxValue(lt, valReg, out);
+                    llvm.__emitCall("void", "bery_array_push", {{"i8*", arrReg}, {"i8*", boxedReg}}, out);
+                }
+            }
         }
         emitGCPush(memoryReg, "i8*", out);
         return;

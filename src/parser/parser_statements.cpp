@@ -30,6 +30,11 @@ std::vector<std::unique_ptr<ASTNode>> Parser::parseVarDecl(AccessSpecifier acces
     std::string varType = typeToken.lexeme;
     do {
         Token name = consume(TokenType::TOKEN_IDENT, "Expected identifier");
+        if (check(TokenType::TOKEN_LBRACKET)) {
+            decls.push_back(parseArrayDeclTail(varType, name, access, isConst));
+            continue;
+        }
+
         std::unique_ptr<ASTNode> value = nullptr;
         if (check(TokenType::TOKEN_EQUAL)) {
             advance();
@@ -41,7 +46,6 @@ std::vector<std::unique_ptr<ASTNode>> Parser::parseVarDecl(AccessSpecifier acces
     consume(TokenType::TOKEN_SEMICOLON, "Expected ';'");
     return decls;
 }
-
 std::unique_ptr<ASTNode> Parser::parseLiteral() {
     Token t = peek();
 
@@ -74,22 +78,7 @@ std::unique_ptr<ASTNode> Parser::parseLiteral() {
     }
 }
 
-// @look ahead 2
-bool Parser::isArrayDecl() {
-    if (isTypeToken(peek().type)) {
-        if (current + 2 < tokens.size() &&
-            tokens[current + 1].type == TokenType::TOKEN_IDENT &&
-            tokens[current + 2].type == TokenType::TOKEN_LBRACKET) {
-            return true;
-        }
-    }
-    return false;
-}
-
-std::unique_ptr<ASTNode> Parser::parseArrayDecl() {
-    Token typeToken = consume(peek().type, "Expected type");
-    std::string elementType = typeToken.lexeme;
-    Token nameToken = consume(TokenType::TOKEN_IDENT, "Expected identifier");
+std::unique_ptr<ASTNode> Parser::parseArrayDeclTail(const std::string& elementType, const Token& nameToken, AccessSpecifier access, bool isConst) {
     std::string name = nameToken.lexeme;
 
     std::vector<int> dimensions;
@@ -117,11 +106,10 @@ std::unique_ptr<ASTNode> Parser::parseArrayDecl() {
             std::cerr << "Bery:Error: [Line " << peek().line << "]: Arrays must be initialized with list inside '{}'\n";
             errors = true;
             while (!isAtEnd() && !check(TokenType::TOKEN_SEMICOLON)) advance();
-            return std::make_unique<ArrayDeclNode>(elementType, name, dimensions, std::move(initializers), nameToken.line);
+            return std::make_unique<ArrayDeclNode>(elementType, name, dimensions, std::move(initializers), access, isConst, nameToken.line);
         }
     }
-    consume(TokenType::TOKEN_SEMICOLON, "Expected ';'");
-    auto decl = std::make_unique<ArrayDeclNode>(elementType, name, dimensions, std::move(initializers), nameToken.line);
+    auto decl = std::make_unique<ArrayDeclNode>(elementType, name, dimensions, std::move(initializers), access, isConst, nameToken.line);
     decl->valueExpr = std::move(valueExpr);
     return decl;
 }

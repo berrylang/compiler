@@ -284,25 +284,48 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& out) {
         if (sym.type.size() > 6 && sym.type.substr(0, 6) == "array<") {
             std::string elemType = sym.type.substr(6, sym.type.size() - 7);
             std::string lt = llvmType(elemType);
-            llvm.__declareExternFn("void", "bery_array_set", {"i8*", "i64", "i8*"});
             std::string arrReg = llvm.__emitLoad("i8*", sym.llvmRegister, out);
             std::string idxReg = genExpression(idxNode->indices[0].get(), "int", out);
             std::string idxExt = llvm.__emitSext("i32", idxReg, "i64", out);
-            std::string valReg = genExpression(assign->value.get(), elemType, out);
-            std::string castReg = llvm.__emitBoxValue(lt, valReg, out);
-            llvm.__emitCall("void", "bery_array_set", {{"i8*", arrReg}, {"i64", idxExt}, {"i8*", castReg}}, out);
-            return valReg;
-        }
 
-        std::string baseType = sym.type.substr(0, sym.type.find('['));
-        targetLT = llvmType(baseType);
-        targetBerryType = baseType;
-        std::string arrType = sym.llvmAllocType;
-        std::vector<std::pair<std::string, std::string>> indices;
-        indices.push_back({"i32", "0"});
-        for (auto& idx : idxNode->indices)
-            indices.push_back({"i32", genExpression(idx.get(), "int", out)});
-        memPtr = llvm.__emitTypedGEP(arrType, sym.llvmRegister, indices, false, out);
+            if (!idxNode->memberChain.empty()) {
+                // objArr[i].x = value; - fetch the boxed element (holds the object
+                // pointer), walk the field chain from there, then fall through to
+                // the normal store logic below like any other assignment target.
+                llvm.__declareExternFn("i8*", "bery_array_get", {"i8*", "i64"});
+                std::string rawReg = llvm.__emitCall("i8*", "bery_array_get", {{"i8*", arrReg}, {"i64", idxExt}}, out);
+                std::string castReg = llvm.__emitBitcast("i8*", rawReg, llvm.__pointerType(lt), out);
+                std::string finalType;
+                memPtr = genFieldChainFromAddress(castReg, elemType, idxNode->memberChain, out, finalType);
+                targetLT = llvmType(finalType);
+                targetBerryType = finalType;
+            } else {
+                llvm.__declareExternFn("void", "bery_array_set", {"i8*", "i64", "i8*"});
+                std::string valReg = genExpression(assign->value.get(), elemType, out);
+                std::string boxedReg = llvm.__emitBoxValue(lt, valReg, out);
+                llvm.__emitCall("void", "bery_array_set", {{"i8*", arrReg}, {"i64", idxExt}, {"i8*", boxedReg}}, out);
+                return valReg;
+            }
+        } else {
+            std::string baseType = sym.type.substr(0, sym.type.find('['));
+            std::string arrType = sym.llvmAllocType;
+            std::vector<std::pair<std::string, std::string>> indices;
+            indices.push_back({"i32", "0"});
+            for (auto& idx : idxNode->indices)
+                indices.push_back({"i32", genExpression(idx.get(), "int", out)});
+            std::string ptrReg = llvm.__emitTypedGEP(arrType, sym.llvmRegister, indices, false, out);
+
+            if (!idxNode->memberChain.empty()) {
+                std::string finalType;
+                memPtr = genFieldChainFromAddress(ptrReg, baseType, idxNode->memberChain, out, finalType);
+                targetLT = llvmType(finalType);
+                targetBerryType = finalType;
+            } else {
+                targetLT = llvmType(baseType);
+                targetBerryType = baseType;
+                memPtr = ptrReg;
+            }
+        }
     }
 
     std::string valReg = genExpression(assign->value.get(), targetBerryType, out);
@@ -399,6 +422,11 @@ std::string CodeGen::genIndexExpr(ASTNode* node, std::ostream& out) {
         std::string idxExt = llvm.__emitSext("i32", idxReg, "i64", out);
         std::string rawReg = llvm.__emitCall("i8*", "bery_array_get", {{"i8*", arrReg}, {"i64", idxExt}}, out);
         std::string castReg = llvm.__emitBitcast("i8*", rawReg, llvm.__pointerType(lt), out);
+        if (!idx->memberChain.empty()) {
+            std::string finalType;
+            std::string fieldPtr = genFieldChainFromAddress(castReg, elemType, idx->memberChain, out, finalType);
+            return llvm.__emitLoad(llvmType(finalType), fieldPtr, out);
+        }
         return llvm.__emitLoad(lt, castReg, out);
     }
 
@@ -410,6 +438,11 @@ std::string CodeGen::genIndexExpr(ASTNode* node, std::ostream& out) {
     for (auto& i : idx->indices)
         indices.push_back({"i32", genExpression(i.get(), "int", out)});
     std::string ptrReg = llvm.__emitTypedGEP(arrType, sym.llvmRegister, indices, false, out);
+    if (!idx->memberChain.empty()) {
+        std::string finalType;
+        std::string fieldPtr = genFieldChainFromAddress(ptrReg, baseType, idx->memberChain, out, finalType);
+        return llvm.__emitLoad(llvmType(finalType), fieldPtr, out);
+    }
     return llvm.__emitLoad(lt, ptrReg, out);
 }
 
@@ -589,9 +622,12 @@ std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& out) {
 
 std::string CodeGen::genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& out, std::string& outType) {
     Symbol& base = symTable.get(parts[0]);
-    std::string curPtr = base.llvmRegister;
-    std::string curType = base.type;
-    for (size_t i = 1; i < parts.size(); ++i) {
+    std::vector<std::string> rest(parts.begin() + 1, parts.end());
+    return genFieldChainFromAddress(base.llvmRegister, base.type, rest, out, outType);
+}
+
+std::string CodeGen::genFieldChainFromAddress(std::string curPtr, std::string curType, const std::vector<std::string>& parts, std::ostream& out, std::string& outType) {
+    for (size_t i = 0; i < parts.size(); ++i) {
         ClassLayout& layout = classLayouts.at(curType);
         std::string objReg = llvm.__emitLoad(llvm.__pointerType(layout.llvmStructType), curPtr, out);
         int fieldIdx = layout.fieldIndex.at(parts[i]);

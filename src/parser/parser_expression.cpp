@@ -1,4 +1,3 @@
-
 #include "parser.h"
 /*
     In Bery, each expression is made up of smaller expressions.
@@ -247,7 +246,13 @@ std::unique_ptr<ASTNode> Parser::parsePrimary(){
                 indices.push_back(parseExpression());
                 consume(TokenType::TOKEN_RBRACKET, "Expected ']' after array index");
             }
-            return std::make_unique<IndexExprNode>(fullName, std::move(indices), t.line);
+            auto idxExpr = std::make_unique<IndexExprNode>(fullName, std::move(indices), t.line);
+            while (check(TokenType::TOKEN_DOT)) {
+                advance();
+                Token member = consume(TokenType::TOKEN_IDENT, "Expected identifier after '.'");
+                idxExpr->memberChain.push_back(member.lexeme);
+            }
+            return idxExpr;
         }
         return std::make_unique<IdentNode>(fullName, "", t.line);
     }

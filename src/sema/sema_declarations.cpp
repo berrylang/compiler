@@ -70,7 +70,7 @@ bool SemanticAnalyzer::isKnownType(const std::string& t) {
         return true;
     if(t.size() > 6 && t.substr(0, 6)== "array<"&& t.back()== '>') {
         std::string inner = t.substr(6,t.size() - 7);
-        return primitiveTypes.count(inner) > 0;
+        return primitiveTypes.count(inner) > 0 || classes.count(inner) > 0;
     }
     return false;
 }
@@ -85,23 +85,38 @@ void SemanticAnalyzer::analyzeArrayDecl(ASTNode* node) {
         std::cerr << "Bery:Error [Line "<< decl->line <<"]: '" << decl->name << "' already declared.\n";
         errors = true; return;
     }
-    if (decl->dimensions.size() == 1 && decl->dimensions[0] == -1) {
+    std::string arrayType = "array<" + decl->elementType + ">";
+    bool isDynamic = decl->dimensions.size() == 1 && decl->dimensions[0] == -1;
+
+    if (isDynamic) {
         if (decl->valueExpr) {
             std::string exprType = typeChecker.analyzeExpression(decl->valueExpr.get());
-            std::string expectedType = "array<" + decl->elementType + ">";
-            if (exprType != "unknown" && exprType != expectedType) {
-                std::cerr << "Bery:Error [Line " << decl->line << "]: Type mismatch for '" << decl->name
-                          << "'. Expected '" << expectedType << "', got '" << exprType << "'\n";
+            if (exprType != "unknown" && exprType != arrayType) {
+                std::cerr << "Bery:Error [Line " << decl->line << "]: Type mismatch for '" << decl->name << "'. Expected '" << arrayType << "', got '" << exprType << "'\n";
                 errors = true;
             }
-            symbolTable.addVariable(decl->name, expectedType, false, true, decl->line);
+            symbolTable.addVariable(decl->name, arrayType, decl->isConst, true, decl->line, decl->dimensions);
             return;
         }
         if (decl->initializers.empty()) {
-            symbolTable.addVariable(decl->name, "array<" + decl->elementType + ">", false, false, decl->line);
+            symbolTable.addVariable(decl->name, arrayType, decl->isConst, false, decl->line, decl->dimensions);
             return;
         }
+        for (auto& initVal : decl->initializers) {
+            std::string exprType = typeChecker.analyzeExpression(initVal.get());
+            if (exprType != "unknown" && exprType != decl->elementType) {
+                if (!(decl->elementType == "float" && exprType == "int") &&
+                    !(decl->elementType == "double" && exprType == "int")) {
+                    std::cerr << "Bery:Error [Line "<< decl->line <<"]: Type mismatch in array initialization.\n";
+                    errors = true; return;
+                }
+            }
+        }
+        std::vector<int> dims = { (int)decl->initializers.size() };
+        symbolTable.addVariable(decl->name, arrayType, decl->isConst, true, decl->line, dims);
+        return;
     }
+
     int totalSize = 1;
     int inferredDim = -1;
     for (size_t i = 0; i < decl->dimensions.size(); ++i) {
@@ -146,11 +161,9 @@ void SemanticAnalyzer::analyzeArrayDecl(ASTNode* node) {
             }
         }
     }
-    std::string typeSignature = decl->elementType;
-    for (size_t i = 0; i < decl->dimensions.size(); ++i) typeSignature += "[]";
-    symbolTable.addVariable(decl->name, typeSignature, false, !decl->initializers.empty(), decl->line, decl->dimensions);
-}
 
+    symbolTable.addVariable(decl->name, arrayType, decl->isConst, !decl->initializers.empty(), decl->line, decl->dimensions);
+}
 void SemanticAnalyzer::analyzeFuncDef(ASTNode* node) {
     auto* func = static_cast<FunctionDefNode*>(node);
 
@@ -168,7 +181,8 @@ void SemanticAnalyzer::analyzeFuncDef(ASTNode* node) {
     currentFunctionReturnType = func->returnType;
     symbolTable.pushScope();
     for (auto& param : func->parameters) {
-        symbolTable.addVariable(param.second, param.first, false, true, func->line);
+        std::vector<int> dims = (param.first.size() > 6 && param.first.substr(0,6) == "array<") ? std::vector<int>{-1} : std::vector<int>{};
+        symbolTable.addVariable(param.second, param.first, false, true, func->line, dims);
     }
     
     for (auto& stmt : func->body->statements) 
@@ -224,6 +238,11 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
     std::unordered_set<std::string> seen;
     if (cls->attributes) {
         for (auto& attr : cls->attributes->attributes) {
+            if (attr->type != NodeType::VAR_DECL) {
+                std::cerr << "Bery:Error [Line " << attr->line << "]: Array-typed class attributes are not supported yet\n";
+                errors = true;
+                continue;
+            }
             auto* field = static_cast<VarDeclNode*>(attr.get());
             if (seen.count(field->name)) {
                 std::cerr << "Bery:Error [Line " << field->line << "]: Duplicate field '"<< field->name << "' in class '" << cls->name << "'\n";
@@ -298,13 +317,16 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
             if (cls->attributes) {
                 symbolTable.addVariable(cls->attributes->selfRef, cls->name, false, true, cls->line);
                 for (auto& attr : cls->attributes->attributes) {
+                    if (attr->type != NodeType::VAR_DECL) continue;
                     auto* field = static_cast<VarDeclNode*>(attr.get());
                     symbolTable.addVariable(field->name, field->varType, false,true, field->line);
                 }
             }
 
-            for (auto& p : func->parameters)
-                symbolTable.addVariable(p.second,p.first,false, true,func->line);
+            for (auto& p : func->parameters) {
+                std::vector<int> dims = (p.first.size() > 6 && p.first.substr(0,6) == "array<") ? std::vector<int>{-1} : std::vector<int>{};
+                symbolTable.addVariable(p.second, p.first, false, true, func->line, dims);
+            }
 
             for (auto& stmt : func->body->statements)
                 analyzeNode(stmt.get());

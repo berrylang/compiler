@@ -438,11 +438,7 @@ std::string TypeChecker::checkIndexExpr(ASTNode* node) {
         return idxNode->resolvedType;
     }
     Symbol& sym = symbolTable.get(idxNode->name);
-    if (sym.type.size() > 6 && sym.type.substr(0, 6) == "array<") {
-        std::string elemType = sym.type.substr(6, sym.type.size() - 7);
-        idxNode->resolvedType = elemType;
-        return idxNode->resolvedType;
-    }
+
     if(sym.type == "string"){
         for(auto& index : idxNode->indices){
             std::string indexType = analyzeExpression(index.get());
@@ -457,29 +453,29 @@ std::string TypeChecker::checkIndexExpr(ASTNode* node) {
         return idxNode->resolvedType;
     }
 
-    int dimCount = 0;
-    size_t pos = sym.type.find('[');
-    while (pos != std::string::npos) {
-        dimCount++;
-        pos = sym.type.find('[', pos + 1);
-    }
-
-    if (dimCount == 0) {
+    if (!(sym.type.size() > 6 && sym.type.substr(0, 6) == "array<")) {
         std::cerr << "Bery:Error [Line " << idxNode->line << "]: Variable '" << idxNode->name << "' is not subscriptable\n";
         errors = true;
         idxNode->resolvedType = "unknown";
         return idxNode->resolvedType;
     }
-
+    int dimCount = (int)sym.arrayDimensions.size();
     if (idxNode->indices.size() > (size_t)dimCount) {
         std::cerr << "Bery:Error [Line " << idxNode->line << "]: Too many indices for array '" << idxNode->name << "'\n";
         errors = true;
         idxNode->resolvedType = "unknown";
         return idxNode->resolvedType;
     }
+
     for (auto& index : idxNode->indices) analyzeExpression(index.get());
-    std::string baseType = sym.type.substr(0, sym.type.find('['));
-    idxNode->resolvedType = baseType;
+    std::string elemType = sym.type.substr(6, sym.type.size() - 7);
+
+    if (!idxNode->memberChain.empty()) {
+        idxNode->resolvedType = resolveFieldChainFrom(elemType, idxNode->memberChain, idxNode->line);
+        return idxNode->resolvedType;
+    }
+
+    idxNode->resolvedType = elemType;
     return idxNode->resolvedType;
 }
 
@@ -558,12 +554,6 @@ std::string TypeChecker::checkAssignmentExpr(ASTNode* node) {
             std::cerr << "Bery:Error [Line " << idxNode->line << "]: Undefined array '" << idxNode->name << "'\n";
             errors = true;
             assign->resolvedType = "unknown";
-            return assign->resolvedType;
-        }
-        Symbol& sym = symbolTable.get(idxNode->name);
-        if (sym.type.substr(0, 6) == "array<") {
-            analyzeExpression(assign->value.get());
-            assign->resolvedType = "void";
             return assign->resolvedType;
         }
         targetName = idxNode->name;
@@ -733,6 +723,7 @@ std::string TypeChecker::resolveFieldType(ClassDefNode* cls, const std::string& 
 VarDeclNode* TypeChecker::findField(ClassDefNode* cls, const std::string& fieldName) {
     if(!cls->attributes) {return nullptr;}
     for(auto& attrNode :cls->attributes->attributes) {
+        if (attrNode->type != NodeType::VAR_DECL) continue; // array-typed fields: not supported yet
         auto* field = static_cast<VarDeclNode*>(attrNode.get());
         if (field->name == fieldName) return field;
     }
@@ -755,7 +746,13 @@ std::string TypeChecker::resolveChainType(const std::vector<std::string>& parts,
         return "unknown";
     }
     std::string curType = symbolTable.get(parts[0]).type;
-    for (size_t i =1; i<parts.size(); ++i) {
+    std::vector<std::string> rest(parts.begin() + 1, parts.end());
+    return resolveFieldChainFrom(curType, rest, line);
+}
+
+
+std::string TypeChecker::resolveFieldChainFrom(std::string curType, const std::vector<std::string>& parts, int line) {
+    for (size_t i = 0; i < parts.size(); ++i) {
         auto classIt = classes.find(curType);
         if (classIt == classes.end()) {
             std::cerr << "Bery:Error [Line " << line << "]: '" << curType << "' is not an object, cannot access '." << parts[i] << "'\n";

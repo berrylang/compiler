@@ -1,0 +1,200 @@
+
+class Point {
+    attributes[self]::
+    int x;
+    int y;
+    methods::
+    Point(int x, int y) {
+        self.x = x;
+        self.y = y;
+    }
+}
+
+class Empty {
+    attributes[self]::
+    int x;
+    methods::
+    Empty() {
+        self.x = 0;
+    }
+}
+
+func makePoint() -> Point {
+    return new Point(7, 8);
+}
+
+run {
+    
+
+
+    int a;
+    println("test 1 passed");
+
+
+
+
+
+
+
+    int a2 = 10;
+    if (a2 == 10) {
+        println("test 2 passed");
+    }
+
+
+
+
+
+
+    int b, c, d3 = 10, e;
+    if (d3 == 10) {
+        println("test 3 passed");
+    }
+
+
+
+
+    const int f = 10;
+    if (f == 10) {
+        println("test 4 passed");
+    }
+
+
+
+
+
+
+    int arr5[];
+    println("test 5 passed");
+
+
+
+
+
+    int arr6[] = {1, 2, 3};
+    if (arr6.len() == 3) {
+        println("test 6 passed");
+    }
+
+
+
+
+
+
+    int arr7[2];
+    println("test 7 passed");
+
+
+
+
+
+
+
+
+
+    int arr8[2] = {1, 2};
+    if (arr8[0] == 1 && arr8[1] == 2) {
+        println("test 8 passed");
+    }
+
+
+
+
+
+
+
+    int arr9[2][3] = {1, 2, 3, 4, 5, 6};
+    if (arr9[1][2] == 6) {
+        println("test 9 passed");
+    }
+
+
+
+
+
+
+
+
+
+
+    int arr10[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    if (arr10[1][2] == 6) {
+        println("test 10 passed");
+    }
+
+
+
+
+    Point p11;
+    println("test 11 passed");
+
+
+
+
+
+
+    Point p12 = new Point(10, 20);
+    if (p12.x == 10 && p12.y == 20) {
+        println("test 12 passed");
+    }
+
+
+
+
+
+
+
+
+
+    Point p13 = makePoint();
+    if (p13.x == 7 && p13.y == 8) {
+        println("test 13 passed");
+    }
+
+
+
+
+
+
+
+    Point parr14[];
+    println("test 14 passed");
+
+
+
+
+
+
+
+
+    Point obj1 = new Point(1, 1);
+    Point obj2 = new Point(2, 2);
+    Point parr15[] = {obj1, obj2};
+    if (parr15.len() == 2) {
+        println("test 15 passed");
+    }
+
+
+
+
+
+
+
+
+    Empty earr16[2];
+    println("test 16 passed");
+
+
+
+
+
+
+
+
+    
+
+    Point parr17[2] = {new Point(20, 20), new Point(3, 4)};
+    if (parr17[0].x == 20 && parr17[1].y == 4) {
+        println("test 17 passed");
+    }
+}

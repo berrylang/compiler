@@ -30,7 +30,7 @@ std::unique_ptr<ASTNode> Parser::parse() {
                 auto runBlock = std::make_unique<RunBlockNode>(runline);
                 while (!isAtEnd() && !check(TokenType::TOKEN_RBRACE)) {
                     try {
-                        runBlock->statements.push_back(parseStatement());
+                        for (auto& statement : parseStatement()) runBlock->statements.push_back(std::move(statement));
                     } catch(ParseError& e) {
                         synchronize();
                     }
@@ -51,18 +51,10 @@ std::unique_ptr<ASTNode> Parser::parse() {
             } else {
                 bool isConst = false;
                 if (check(TokenType::TOKEN_CONST)) { advance(); isConst = true; }
-                if (isTypeToken(peek().type)) {
-                    if (!isConst && isArrayDecl()) {
-                        auto decl = parseArrayDecl();
-                        program->globals.push_back(std::move(decl));
-                    } else {
-                        auto decls = parseVarDecl(AccessSpecifier::PUBLIC,isConst);
-                        for (auto& d : decls) program->globals.push_back(std::move(d));
-                    }
-                } else if (isClassVarDecl()) { 
+                if (isTypeToken(peek().type) || isClassVarDecl()) {
                     auto decls = parseVarDecl(AccessSpecifier::PUBLIC, isConst);
-                    for (auto&d : decls) program->globals.push_back(std::move(d));
-                }else {
+                    for (auto& d : decls) program->globals.push_back(std::move(d));
+                } else {
                     std::cerr << "Bery:Error [Line " << peek().line << "]: Unexpected token '" << peek().lexeme << "'\n";
                     errors = true;
                     throw ParseError();
@@ -121,14 +113,18 @@ bool Parser::isTypeToken(TokenType t) {
            t == TokenType::TOKEN_CHAR ||
            t == TokenType::TOKEN_STRING; 
 }
-
+std::vector<std::unique_ptr<ASTNode>> Parser::single(std::unique_ptr<ASTNode> node) {
+    std::vector<std::unique_ptr<ASTNode>> out;
+    out.push_back(std::move(node));
+    return out;
+}
 std::unique_ptr<BlockNode> Parser::parseBlock() {
     int line = previous().line;
 
     auto block = std::make_unique<BlockNode>(line);
     while(!isAtEnd() && !check(TokenType::TOKEN_RBRACE)){
         try {
-            block->statements.push_back(parseStatement());
+            for (auto& stmt : parseStatement()) block->statements.push_back(std::move(stmt));
         }
         catch(ParseError& e) {
             synchronize();
@@ -139,22 +135,22 @@ std::unique_ptr<BlockNode> Parser::parseBlock() {
     
 }
 
-std::unique_ptr<ASTNode> Parser::parseStatement() {
+std::vector<std::unique_ptr<ASTNode>> Parser::parseStatement() {
     if (check(TokenType::TOKEN_IF)) {
-        return parseIfStmt();
+        return single(parseIfStmt());
     }
     if (check(TokenType::TOKEN_ELSE)){
         advance();
-        return parseBlock();
+        return single(parseBlock());
     }
     if(check(TokenType::TOKEN_WHILE)){
-        return parseWhileStmt();
+        return single(parseWhileStmt());
     }
     if(check(TokenType::TOKEN_DOWHILE)){
-        return parseDoWhileStmt();
+        return single(parseDoWhileStmt());
     }
     if(check(TokenType::TOKEN_FOR)){
-        return parseForStmt();
+        return single(parseForStmt());
     }
     bool isConst = false;
     if(check(TokenType::TOKEN_CONST)){
@@ -162,39 +158,28 @@ std::unique_ptr<ASTNode> Parser::parseStatement() {
         isConst = true;
     }
     if (check(TokenType::TOKEN_SWITCH)) {
-        return parseSwitchStmt();
+        return single(parseSwitchStmt());
     }
     if (check(TokenType::TOKEN_BREAK)) {
-        return parseBreakStmt();
+        return single(parseBreakStmt());
     }
     if(check(TokenType::TOKEN_CONTINUE)) {
-        return parseContinueStmt();
+        return single(parseContinueStmt());
     }
     if(check(TokenType::TOKEN_PASS)) {
-        return parsePassStmt();
+        return single(parsePassStmt());
     }
     if(check(TokenType::TOKEN_RETURN)){
-        return parseReturnStmt();
+        return single(parseReturnStmt());
     }
     if (check(TokenType::TOKEN_ENUM)) {
-        return parseEnumDecl();
+        return single(parseEnumDecl());
     }
-    
 
     if(isTypeToken(peek().type) || isClassVarDecl()){
-        if(!isConst && isTypeToken(peek().type) && isArrayDecl()) return parseArrayDecl();
-        std::vector<std::unique_ptr<ASTNode>>decls = parseVarDecl(AccessSpecifier::PUBLIC,isConst);
-        if(decls.size() == 1){
-            return std::move(decls[0]);    
-        };
-        auto multiDeclBlock = std::make_unique<BlockNode>(previous().line);
-        
-        for(auto& d:decls){
-            multiDeclBlock->statements.push_back(std::move(d));
-        }
-        return multiDeclBlock;
+        return parseVarDecl(AccessSpecifier::PUBLIC, isConst);
     }
     auto expr = parseExpression();
     consume(TokenType::TOKEN_SEMICOLON, "Expected ';' after expression");
-    return expr;
+    return single(std::move(expr));
 }

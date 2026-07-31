@@ -119,4 +119,5 @@ private:
    std::string currentClassName = "";
    std::string currentSelfRef   = "";
    std::string genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& out, std::string& outType);
+   std::string genFieldChainFromAddress(std::string curPtr, std::string curType, const std::vector<std::string>& parts, std::ostream& out, std::string& outType);
 };

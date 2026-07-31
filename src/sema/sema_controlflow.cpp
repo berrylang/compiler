@@ -175,10 +175,6 @@ void SemanticAnalyzer::analyzeForInStmt(ASTNode* node) {
         //array<int> 
         if (iterType.size() > 6 && iterType.substr(0,6)=="array<" && iterType.back()=='>'){
             elementType = iterType.substr(6,iterType.size()-7);
-        } 
-        //int[] 
-        else if(iterType.find("[]") != std::string::npos){
-            elementType = iterType.substr(0,iterType.find("[]"));
         } else if(iterType == "string"){
             elementType = "char";
         } else if(iterType != "unknown") {

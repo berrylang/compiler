@@ -55,13 +55,13 @@ private:
     // @every parse function
     // @statements
     std::vector<std::unique_ptr<ASTNode>> parseVarDecl(AccessSpecifier access,bool isConst);
+    std::unique_ptr<ASTNode> parseArrayDeclTail(const std::string& elementType, const Token& nameToken, AccessSpecifier access, bool isConst);
     std::unique_ptr<ASTNode> parseLiteral();
-    bool isArrayDecl();
-    std::unique_ptr<ASTNode> parseArrayDecl();
     void parseArrayInitializer(std::vector<std::unique_ptr<ASTNode>>& initializers);
     std::unique_ptr<ASTNode> parseEnumDecl();
     std::unique_ptr<ASTNode> parseImportDecl();
     std::unique_ptr<ASTNode> parseExternDecl();
+    static std::vector<std::unique_ptr<ASTNode>> single(std::unique_ptr<ASTNode> node);
     
     //@expressions - recursive descent
     std::unique_ptr<ASTNode> parseExpression();
@@ -80,7 +80,7 @@ private:
     std::unique_ptr<ASTNode> parseTernary();
     
     // @repititive blocks
-    std::unique_ptr<ASTNode> parseStatement();
+    std::vector<std::unique_ptr<ASTNode>> parseStatement();
     std::unique_ptr<BlockNode> parseBlock();
 
     // @controlflow
