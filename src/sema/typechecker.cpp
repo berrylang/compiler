@@ -438,6 +438,7 @@ std::string TypeChecker::checkIndexExpr(ASTNode* node) {
         return idxNode->resolvedType;
     }
     Symbol& sym = symbolTable.get(idxNode->name);
+
     if(sym.type == "string"){
         for(auto& index : idxNode->indices){
             std::string indexType = analyzeExpression(index.get());
@@ -458,7 +459,6 @@ std::string TypeChecker::checkIndexExpr(ASTNode* node) {
         idxNode->resolvedType = "unknown";
         return idxNode->resolvedType;
     }
-
     int dimCount = (int)sym.arrayDimensions.size();
     if (idxNode->indices.size() > (size_t)dimCount) {
         std::cerr << "Bery:Error [Line " << idxNode->line << "]: Too many indices for array '" << idxNode->name << "'\n";
@@ -469,6 +469,12 @@ std::string TypeChecker::checkIndexExpr(ASTNode* node) {
 
     for (auto& index : idxNode->indices) analyzeExpression(index.get());
     std::string elemType = sym.type.substr(6, sym.type.size() - 7);
+
+    if (!idxNode->memberChain.empty()) {
+        idxNode->resolvedType = resolveFieldChainFrom(elemType, idxNode->memberChain, idxNode->line);
+        return idxNode->resolvedType;
+    }
+
     idxNode->resolvedType = elemType;
     return idxNode->resolvedType;
 }
@@ -717,12 +723,13 @@ std::string TypeChecker::resolveFieldType(ClassDefNode* cls, const std::string& 
 VarDeclNode* TypeChecker::findField(ClassDefNode* cls, const std::string& fieldName) {
     if(!cls->attributes) {return nullptr;}
     for(auto& attrNode :cls->attributes->attributes) {
-        if (attrNode->type != NodeType::VAR_DECL) continue;
+        if (attrNode->type != NodeType::VAR_DECL) continue; // array-typed fields: not supported yet
         auto* field = static_cast<VarDeclNode*>(attrNode.get());
         if (field->name == fieldName) return field;
     }
     return nullptr;
 }
+
 bool TypeChecker::checkMemberAccess(AccessSpecifier access, const std::string& className, const std::string& memberName, const std::string& type, int line) {
     if (access == AccessSpecifier::PUBLIC) return true;
     if (currentClass == className) return true;
@@ -739,7 +746,13 @@ std::string TypeChecker::resolveChainType(const std::vector<std::string>& parts,
         return "unknown";
     }
     std::string curType = symbolTable.get(parts[0]).type;
-    for (size_t i =1; i<parts.size(); ++i) {
+    std::vector<std::string> rest(parts.begin() + 1, parts.end());
+    return resolveFieldChainFrom(curType, rest, line);
+}
+
+
+std::string TypeChecker::resolveFieldChainFrom(std::string curType, const std::vector<std::string>& parts, int line) {
+    for (size_t i = 0; i < parts.size(); ++i) {
         auto classIt = classes.find(curType);
         if (classIt == classes.end()) {
             std::cerr << "Bery:Error [Line " << line << "]: '" << curType << "' is not an object, cannot access '." << parts[i] << "'\n";

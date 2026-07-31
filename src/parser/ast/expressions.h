@@ -109,6 +109,7 @@ struct CastExprNode : public ASTNode {
 struct IndexExprNode : public ASTNode {
     std::string name;
     std::vector<std::unique_ptr<ASTNode>> indices;
+    std::vector<std::string> memberChain;
 
     IndexExprNode(std::string name, std::vector<std::unique_ptr<ASTNode>> idx, int ln)
         : name(name), indices(std::move(idx)) {

@@ -193,8 +193,8 @@ run {
 
     
 
-    ---Point parr17[2] = {new Point(20, 20), new Point(3, 4)};
-    ---if (parr17[0].x == 20 && parr17[1].y == 4) {
-    ---    println("test 17 passed");
-    ---}
+    Point parr17[2] = {new Point(20, 20), new Point(3, 4)};
+    if (parr17[0].x == 20 && parr17[1].y == 4) {
+        println("test 17 passed");
+    }
 }
