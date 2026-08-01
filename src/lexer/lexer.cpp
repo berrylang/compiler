@@ -543,7 +543,7 @@ void Lexer::skipComments(bool isMLC){
                 advance();
                 if(peek()=='-'){
                     advance();
-                    break;
+                    return;
                 }
             }
             if(peek()=='\n'){line++;}

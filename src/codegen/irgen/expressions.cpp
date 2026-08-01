@@ -124,15 +124,83 @@ std::string CodeGen::genUnaryExpr(ASTNode* node, const std::string& expectedType
         return llvm.__emitBinaryOp("^", lt, false, opReg, "-1", out);
     }
 
-    if (unary->operand->type != NodeType::IDENT) return "0";
-    auto* ident = static_cast<IdentNode*>(unary->operand.get());
-    std::string memPtr = symTable.get(ident->name).llvmRegister;
-    std::string oldReg = genExpression(unary->operand.get(), expectedType, out);
-    std::string one = isFloat ? "1.0" : "1";
     bool isIncrement = (unary->optr == "++" || unary->optr == "post++");
-    std::string newRegVal = llvm.__emitBinaryOp(isIncrement ? "+" : "-", lt, isFloat, oldReg, one, out);
-    llvm.__emitStore(lt, newRegVal, memPtr, out);
-    return (unary->optr == "post++" || unary->optr == "post--") ? oldReg : newRegVal;
+    bool isPost = (unary->optr == "post++" || unary->optr == "post--");
+    auto stepAt = [&](std::string memPtr, std::string valueType) -> std::string {
+        std::string vlt = llvmType(valueType);
+        bool vf = (valueType == "float" || valueType == "double");
+        std::string oldReg = llvm.__emitLoad(vlt, memPtr, out);
+        std::string oneV = vf ? "1.0" : "1";
+        std::string newRegVal = llvm.__emitBinaryOp(isIncrement ? "+" : "-", vlt, vf, oldReg, oneV, out);
+        llvm.__emitStore(vlt, newRegVal, memPtr, out);
+        return isPost ? oldReg : newRegVal;
+    };
+
+    if (unary->operand->type == NodeType::IDENT) {
+        auto* ident = static_cast<IdentNode*>(unary->operand.get());
+        size_t dot = ident->name.find('.');
+        if (dot != std::string::npos) {
+            std::vector<std::string> parts = splitDots(ident->name);
+            std::vector<std::string> headParts(parts.begin(), parts.end() - 1);
+            std::string chainType;
+            std::string chainPtr = genFieldChainAddressing(headParts, out, chainType);
+            ClassLayout& layout = classLayouts.at(chainType);
+            int fieldIdx = layout.fieldIndex.at(parts.back());
+            std::string objReg = llvm.__emitLoad(llvm.__pointerType(layout.llvmStructType), chainPtr, out);
+            std::string memPtr = llvm.__emitFieldGEP(layout.llvmStructType, objReg, fieldIdx, out);
+            return stepAt(memPtr, layout.fields[fieldIdx].first);
+        }
+        Symbol& sym = symTable.get(ident->name);
+        return stepAt(sym.llvmRegister, sym.type);
+    }
+
+    if (unary->operand->type == NodeType::INDEX_EXPR) {
+        auto* idxNode = static_cast<IndexExprNode*>(unary->operand.get());
+        Symbol& sym = symTable.get(idxNode->name);
+
+        if (sym.type.size() > 6 && sym.type.substr(0, 6) == "array<") {
+            std::string elemType = sym.type.substr(6, sym.type.size() - 7);
+            std::string elt = llvmType(elemType);
+            llvm.__declareExternFn("i8*", "bery_array_get", {"i8*", "i64"});
+            std::string arrReg = llvm.__emitLoad("i8*", sym.llvmRegister, out);
+            std::string idxReg = genExpression(idxNode->indices[0].get(), "int", out);
+            std::string idxExt = llvm.__emitSext("i32", idxReg, "i64", out);
+            std::string rawReg = llvm.__emitCall("i8*", "bery_array_get", {{"i8*", arrReg}, {"i64", idxExt}}, out);
+            std::string castReg = llvm.__emitBitcast("i8*", rawReg, llvm.__pointerType(elt), out);
+
+            if (!idxNode->memberChain.empty()) {
+                std::string finalType;
+                std::string fieldPtr = genFieldChainFromAddress(castReg, elemType, idxNode->memberChain, out, finalType);
+                return stepAt(fieldPtr, finalType);
+            }
+
+            bool ef = (elemType == "float" || elemType == "double");
+            std::string oldReg = llvm.__emitLoad(elt, castReg, out);
+            std::string oneV = ef ? "1.0" : "1";
+            std::string newRegVal = llvm.__emitBinaryOp(isIncrement ? "+" : "-", elt, ef, oldReg, oneV, out);
+            llvm.__declareExternFn("void", "bery_array_set", {"i8*", "i64", "i8*"});
+            std::string boxedReg = llvm.__emitBoxValue(elt, newRegVal, out);
+            llvm.__emitCall("void", "bery_array_set", {{"i8*", arrReg}, {"i64", idxExt}, {"i8*", boxedReg}}, out);
+            return isPost ? oldReg : newRegVal;
+        }
+
+        std::string baseType = sym.type.substr(0, sym.type.find('['));
+        std::string arrType = sym.llvmAllocType;
+        std::vector<std::pair<std::string, std::string>> indices;
+        indices.push_back({"i32", "0"});
+        for (auto& i : idxNode->indices)
+            indices.push_back({"i32", genExpression(i.get(), "int", out)});
+        std::string ptrReg = llvm.__emitTypedGEP(arrType, sym.llvmRegister, indices, false, out);
+
+        if (!idxNode->memberChain.empty()) {
+            std::string finalType;
+            std::string fieldPtr = genFieldChainFromAddress(ptrReg, baseType, idxNode->memberChain, out, finalType);
+            return stepAt(fieldPtr, finalType);
+        }
+        return stepAt(ptrReg, baseType);
+    }
+
+    return "0";
 }
 
 std::string CodeGen::genBetweenExpr(ASTNode* node, std::ostream& out) {

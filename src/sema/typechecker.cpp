@@ -204,7 +204,7 @@ std::string TypeChecker::checkUnaryExpr(ASTNode* node) {
     auto* unary = static_cast<UnaryExprNode*>(node);
     std::string optype = analyzeExpression(unary->operand.get());
     if(unary->optr=="++"||unary->optr=="--"||unary->optr=="post++"||unary->optr=="post--"){
-        if(unary->operand->type != NodeType::IDENT){
+        if(unary->operand->type != NodeType::IDENT && unary->operand->type != NodeType::INDEX_EXPR){
             std::cerr<<"Bery:Error [Line "<< unary->line <<"]: Identifier requried as operand of increment or decrement operator\n";
             errors = true;
             unary->resolvedType = "unknown";
