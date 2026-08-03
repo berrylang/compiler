@@ -5,7 +5,7 @@
 void LLVMHelper::__declareExtern(const std::string& declareText, const std::string& key) {
     if (declaredExterns.count(key)) return;
     declaredExterns.insert(key);
-    __BRE_declares << declareText << "\n";
+    __BRE_declares << declareText <<"\n";
 }
 
 std::string LLVMHelper::__formatDeclare(const std::string& returnType, const std::string& functionName, const std::vector<std::string>& parameterTypes) {

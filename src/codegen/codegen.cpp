@@ -24,39 +24,39 @@
 #include <iomanip>
 #include <functional>
 
-CodeGen::CodeGen(ASTNode* root, SymbolTable& symTable)
-   : root(root), symTable(symTable){}
+CodeGen::CodeGen(ASTNode* root, SymbolTable& symbolTable)
+   : root(root), symbolTable(symbolTable){}
 
 void CodeGen::generate(const std::string& outputPath) {
     auto* program = static_cast<ProgramNode*>(root);
     
-    std::ostringstream globalsOut;
-    globalsOut << "declare double @llvm.pow.f64(double, double)\n";
-    globalsOut << "declare void @bery_runtime_startup()\n";
-    globalsOut << "declare void @bery_runtime_shutdown()\n";
+    std::ostringstream globalsOutputStream;
+    globalsOutputStream <<"declare double @llvm.pow.f64(double, double)\n";
+    globalsOutputStream <<"declare void @bery_runtime_startup()\n";
+    globalsOutputStream <<"declare void @bery_runtime_shutdown()\n";
 
     for (auto& node : program->globals) {
         if (node->type == NodeType::FUNC_DEF) {
             auto* func = static_cast<FunctionDefNode*>(node.get());
             CodeGenFunctionSignature signature;
             signature.returnType = func->returnType;
-            for (auto& p : func->parameters) signature.paramTypes.push_back(p.first);
+            for (auto& p : func->parameters) signature.parameterTypes.push_back(p.first);
             functions[func->name] = signature;
             
-            genFuncDef(node.get(), globalsOut);
+            genFuncDef(node.get(), globalsOutputStream);
         }
         else if (node->type == NodeType::EXTERN_DECL) {
-            auto* ext = static_cast<ExternDeclNode*>(node.get());
+            auto* extern_node = static_cast<ExternDeclNode*>(node.get());
             CodeGenFunctionSignature signature;
-            signature.returnType = ext->returnType;
+            signature.returnType = extern_node->returnType;
 
             std::vector<std::string> parameterLLVMTypes;
-            for (auto& p : ext->parameters) {
-                signature.paramTypes.push_back(p.first);
+            for (auto& p : extern_node->parameters) {
+                signature.parameterTypes.push_back(p.first);
                 parameterLLVMTypes.push_back(llvmType(p.first));
             }
-            functions[ext->name] = signature;
-            globalsOut << llvm.__formatDeclare(llvmType(ext->returnType), ext->name, parameterLLVMTypes) << "\n";
+            functions[extern_node->name] = signature;
+            globalsOutputStream << llvm.__formatDeclare(llvmType(extern_node->returnType), extern_node->name, parameterLLVMTypes) <<"\n";
         }else if (node->type == NodeType::CLASS_DEF) {
             genClassDecl(node.get());
         }
@@ -68,9 +68,9 @@ void CodeGen::generate(const std::string& outputPath) {
             std::string lt = llvmType(decl->varType);
             std::string initVal = extractConstant(decl->value.get());
             
-            symTable.get(decl->name).llvmRegister = llvm.__globalRef(decl->name);
-            symTable.get(decl->name).llvmAllocType = lt;             
-            llvm.__emitGlobalVar(decl->name, lt, initVal, globalsOut);
+            symbolTable.get(decl->name).llvmRegister = llvm.__globalRef(decl->name);
+            symbolTable.get(decl->name).llvmAllocType = lt;             
+            llvm.__emitGlobalVar(decl->name, lt, initVal, globalsOutputStream);
         }
         else if (node->type == NodeType::ENUM_DECL) {
             auto* enumDecl = static_cast<EnumDeclNode*>(node.get());
@@ -80,9 +80,9 @@ void CodeGen::generate(const std::string& outputPath) {
                 std::string mangledName = enumDecl->name + "." + val;
                 std::string lt = "i32";
                 
-                symTable.get(mangledName).llvmRegister = llvm.__globalRef(mangledName);
-                symTable.get(mangledName).llvmAllocType = lt;
-                llvm.__emitGlobalVar(mangledName, lt, std::to_string(currentValue++), globalsOut);
+                symbolTable.get(mangledName).llvmRegister = llvm.__globalRef(mangledName);
+                symbolTable.get(mangledName).llvmAllocType = lt;
+                llvm.__emitGlobalVar(mangledName, lt, std::to_string(currentValue++), globalsOutputStream);
             }
         }
         else if (node->type == NodeType::ARRAY_DECL) {
@@ -90,15 +90,15 @@ void CodeGen::generate(const std::string& outputPath) {
             if (decl->dimensions.size() == 1 && decl->dimensions[0] == -1) {
                 llvm.__declareExternFn("i8*", "bery_array_new", {"i64"});
                 std::string memoryReg = llvm.__globalRef(decl->name, "_slot");
-                symTable.get(decl->name).llvmRegister = memoryReg;
-                symTable.get(decl->name).llvmAllocType = "i8*";
-                llvm.__emitGlobalVar(decl->name + "_slot", "i8*", "null", globalsOut);
+                symbolTable.get(decl->name).llvmRegister = memoryReg;
+                symbolTable.get(decl->name).llvmAllocType = "i8*";
+                llvm.__emitGlobalVar(decl->name + "_slot", "i8*", "null", globalsOutputStream);
                 continue;
             }
-            symTable.get(decl->name).llvmRegister = llvm.__globalRef(decl->name);
+            symbolTable.get(decl->name).llvmRegister = llvm.__globalRef(decl->name);
             std::string lt= llvmType(decl->elementType);
             std::string arrType =llvm.__nestedArrayType(lt, decl->dimensions);
-            symTable.get(decl->name).llvmAllocType = arrType;
+            symbolTable.get(decl->name).llvmAllocType = arrType;
             std::string initVal;
             if (decl->initializers.empty()) {
                 initVal = "zeroinitializer";
@@ -139,13 +139,13 @@ void CodeGen::generate(const std::string& outputPath) {
 
                 initVal = buildNestedInit(0, 0);
             }
-            llvm.__emitGlobalVar(decl->name, arrType, initVal, globalsOut);
+            llvm.__emitGlobalVar(decl->name, arrType, initVal, globalsOutputStream);
         }
     }
 
     std::ostringstream body;
     llvm.__emitFunctionHeader("i32", "main", {}, body);
-    body << "    call void @bery_runtime_startup()\n";
+    body <<"    call void @bery_runtime_startup()\n";
     for (auto& clPair : classLayouts) {
         ClassLayout& cl = clPair.second;
         int nameLen = (int)cl.name.length() + 1;
@@ -168,24 +168,24 @@ void CodeGen::generate(const std::string& outputPath) {
     }
 
     if (program->runBlock) {
-        symTable.pushScope();
+        symbolTable.pushScope();
         for (auto& node : program->runBlock->statements) {
             genStatement(node.get(), body);
         }
-        symTable.popScope();
+        symbolTable.popScope();
     }
     int rootsInMain = popGCScope();
     emitGCPops(rootsInMain, body);
-    body << "    call void @bery_runtime_shutdown()\n";
+    body <<"    call void @bery_runtime_shutdown()\n";
     llvm.__emitBr("main_end", body);
     llvm.__emitLabel("main_end", body);
     llvm.__emitReturn("i32", "0", body);
     llvm.__emitFunctionFooter(body);
 
-    std::ofstream out(outputPath);
-    out << llvm.__STRUCTURE_declares.str();
-    out << globalsOut.str();
-    out << llvm.__BRE_declares.str();
-    out << llvm.__GLOBAL_STRINGS.str() << "\n";
-    out << body.str();
+    std::ofstream outputStream(outputPath);
+    outputStream << llvm.__STRUCTURE_declares.str();
+    outputStream << globalsOutputStream.str();
+    outputStream << llvm.__BRE_declares.str();
+    outputStream << llvm.__GLOBAL_STRINGS.str() <<"\n";
+    outputStream << body.str();
 }

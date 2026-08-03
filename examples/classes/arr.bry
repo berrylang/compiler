@@ -1,0 +1,25 @@
+
+
+class Point {
+    attributes[this]::
+        private int x[2] = {1, 2};
+
+    methods::
+        Point() {
+            for (int i = 0; i < x.len(); i++) {
+                this.x[i] = ++this.x[i];
+            }
+        }
+
+        public func print_arr() {
+            for (int i = 0; i < x.len(); i++) {
+                println(this.x[i]);
+            }
+        }
+}
+
+run {
+    Point p = new Point();
+
+    p.print_arr();
+}

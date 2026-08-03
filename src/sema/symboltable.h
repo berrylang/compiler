@@ -35,7 +35,7 @@ struct Symbol {
    // return type for functions,
    // class name itself for classes, because ofc classes are user defined datatypes.
    std::string type;
-   std::vector<std::string> paramTypes; // for functions only.
+   std::vector<std::string> parameterTypes; // for functions only.
 
 
    bool isConst = false;
@@ -58,7 +58,7 @@ public:
    void add(const std::string& name, Symbol sym);
 
    void addVariable(const std::string& name, const std::string& type, bool isConst, bool isInitialized, int line, std::vector<int> dims = {});
-   void addFunction(const std::string& name, const std::string& returnType, std::vector<std::string> paramTypes, int line);
+   void addFunction(const std::string& name, const std::string& returnType, std::vector<std::string> parameterTypes, int line);
    void addClass(const std::string& name, int line);
 
    bool exists(const std::string& name);

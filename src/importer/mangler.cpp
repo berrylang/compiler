@@ -96,7 +96,7 @@ void ASTNameMangler::mangle(ASTNode* node) {
         }
         case NodeType::BLOCK: {
             auto* n = static_cast<BlockNode*>(node);
-            for (auto& stmt : n->statements) mangle(stmt.get());
+            for (auto& statement : n->statements) mangle(statement.get());
             break;
         }
         case NodeType::IF_STMT: {
@@ -120,12 +120,12 @@ void ASTNameMangler::mangle(ASTNode* node) {
         }
         case NodeType::FOR_STMT: {
             auto* n = static_cast<ForStmtNode*>(node);
-            for(auto& stmt :n->init){
-                mangle(stmt.get());
+            for(auto& statement :n->init){
+                mangle(statement.get());
             }
             if (n->condition) mangle(n->condition.get());
-            for(auto& stmt : n->update){
-                mangle(stmt.get());
+            for(auto& statement : n->update){
+                mangle(statement.get());
             }
             mangle(n->body.get());
             break;
@@ -143,9 +143,9 @@ void ASTNameMangler::mangle(ASTNode* node) {
             mangle(n->condition.get());
             for (auto& c : n->cases) {
                 if (c.value) mangle(c.value.get());
-                for (auto& stmt : c.statements) mangle(stmt.get());
+                for (auto& statement : c.statements) mangle(statement.get());
             }
-            for (auto& stmt : n->defaultBlock) mangle(stmt.get());
+            for (auto& statement : n->defaultBlock) mangle(statement.get());
             break;
         }
         case NodeType::RETURN_STMT: {

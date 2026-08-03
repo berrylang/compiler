@@ -4,7 +4,7 @@
 #include "../../parser/ast/functions.h"
 
 
-std::string CodeGen::genBREPrintCall(ASTNode* node, std::ostream& out) {
+std::string CodeGen::genBREPrintCall(ASTNode* node, std::ostream& outputStream) {
     auto* call = static_cast<CallExprNode*>(node);
     const std::string& callee = call->callee;
 
@@ -47,8 +47,8 @@ std::string CodeGen::genBREPrintCall(ASTNode* node, std::ostream& out) {
         else { sym = "__bery_print_int";    llvmT = "i32"; }
 
         llvm.__declareExtern("declare void @" + sym + "(" + llvmT + ")", sym);
-        std::string argReg = genExpression(arg, argType, out);
-        llvm.__emitCall("void", sym, {{llvmT, argReg}}, out);
+        std::string argReg = genExpression(arg, argType, outputStream);
+        llvm.__emitCall("void", sym, {{llvmT, argReg}}, outputStream);
     };
 
     if (callee == "print") {
@@ -61,7 +61,7 @@ std::string CodeGen::genBREPrintCall(ASTNode* node, std::ostream& out) {
             emitPrint(call->arguments[0].get());
         }
         llvm.__declareExtern("declare void @bery_println()", "bery_println");
-        llvm.__emitCall("void", "bery_println", {}, out);
+        llvm.__emitCall("void", "bery_println", {}, outputStream);
         return "0";
     }
     struct InputMapping {
@@ -85,8 +85,8 @@ std::string CodeGen::genBREPrintCall(ASTNode* node, std::ostream& out) {
                 std::string("declare ") + m.llvmRet + " @" + m.sym + "(i8*)",
                 m.sym
             );
-            std::string promptReg = genExpression(call->arguments[0].get(), "string", out);
-            return llvm.__emitCall(m.llvmRet, m.sym, {{"i8*", promptReg}}, out);
+            std::string promptReg = genExpression(call->arguments[0].get(), "string", outputStream);
+            return llvm.__emitCall(m.llvmRet, m.sym, {{"i8*", promptReg}}, outputStream);
         }
     }
 

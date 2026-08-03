@@ -45,7 +45,7 @@ void Importer::loadModule(const std::string& modName, const std::string& fullPat
     importedFiles.insert(fullPath);
     std::ifstream file(fullPath);
     if (!file.is_open()) {
-        std::cerr << "Bery:Error: Cannot find imported module '" << fullPath << "'\n";
+        std::cerr <<"Bery:Error: Cannot find imported module '" << fullPath <<"'\n";
         exit(1);
     }
     std::stringstream buffer;
@@ -57,7 +57,7 @@ void Importer::loadModule(const std::string& modName, const std::string& fullPat
     auto* importedProg = static_cast<ProgramNode*>(ast.get());
 
     if (parser.hasErrors()) {
-        std::cerr << "Bery: Compilation halted due to syntax errors in imported module '" << modName << "'.\n";
+        std::cerr <<"Bery: Compilation halted due to syntax errors in imported module '" << modName <<"'.\n";
         exit(1);
     }
 

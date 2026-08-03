@@ -36,7 +36,7 @@ void SemanticAnalyzer::analyzeIfStmt(ASTNode* node) {
     std::string conditionType = typeChecker.analyzeExpression(ifStmt->conditions.get());
 
     if(conditionType != "bool" && conditionType != "unknown"){
-        std::cerr << "Bery:Error [Line " << ifStmt->line << "]: if condition must evaluate to bool \n";
+        std::cerr <<"Bery:Error [Line " << ifStmt->line <<"]: if condition must evaluate to bool \n";
         errors = true;
     }
 
@@ -57,7 +57,7 @@ void SemanticAnalyzer::analyzeSwitchStmt(ASTNode* node) {
     std::string condType = typeChecker.analyzeExpression(sw->condition.get());
 
     if (condType != "unknown" && condType != "int" && condType != "bigint" && condType != "char") {
-        std::cerr << "Bery:Error [Line " << sw->line << "]: Invalid switch condition type '" << condType << "'. Expected int, bigint, or char.\n";
+        std::cerr <<"Bery:Error [Line " << sw->line <<"]: Invalid switch condition type '" << condType <<"'. Expected int, bigint, or char.\n";
         errors = true;
     }
 
@@ -67,7 +67,7 @@ void SemanticAnalyzer::analyzeSwitchStmt(ASTNode* node) {
         if (c.value) {
             std::string caseType = typeChecker.analyzeExpression(c.value.get());
             if (caseType != "unknown" && condType != "unknown" && caseType != condType) {
-                std::cerr << "Bery:Error [Line " << sw->line << "]: Case type '" << caseType << "' does not match switch condition type '" << condType << "'\n";
+                std::cerr <<"Bery:Error [Line " << sw->line <<"]: Case type '" << caseType <<"' does not match switch condition type '" << condType <<"'\n";
                 errors = true;
             }
         }
@@ -88,14 +88,14 @@ void SemanticAnalyzer::analyzeSwitchStmt(ASTNode* node) {
 
 void SemanticAnalyzer::analyzeBreakStmt(ASTNode* node) {
     if (loopOrSwitchDepth <= 0) {
-        std::cerr << "Bery:Error [Line " << node->line << "]: 'break' used outside of a loop or switch.\n";
+        std::cerr <<"Bery:Error [Line " << node->line <<"]: 'break' used outside of a loop or switch.\n";
         errors = true;
     }
 }
 
 void SemanticAnalyzer::analyzeContinueStmt(ASTNode* node) {
     if (loopDepth <= 0){
-        std::cerr << "Bery:Error [Line " << node->line << "]: 'continue' used outside of a loop. \n";
+        std::cerr <<"Bery:Error [Line " << node->line <<"]: 'continue' used outside of a loop. \n";
         errors = true;
     }
 }
@@ -105,7 +105,7 @@ void SemanticAnalyzer::analyzeWhileStmt(ASTNode* node){
     std::string conditionType = typeChecker.analyzeExpression(whileStmt->condition.get());
 
     if(conditionType != "bool" && conditionType != "unknown"){
-        std::cerr << "Bery:Error [Line " << whileStmt->line << "]: 'while' condition must evaluate to 'bool' \n";
+        std::cerr <<"Bery:Error [Line " << whileStmt->line <<"]: 'while' condition must evaluate to 'bool' \n";
         errors = true;
     }
 
@@ -121,7 +121,7 @@ void SemanticAnalyzer::analyzeDoWhileStmt(ASTNode* node){
     std::string conditionType = typeChecker.analyzeExpression(dowhilestmt->condition.get());
 
     if(conditionType != "bool" && conditionType != "unknown"){
-        std::cerr << "Bery:Error [Line " << dowhilestmt->line << "]: 'while' condition must evaluate to 'bool' \n";
+        std::cerr <<"Bery:Error [Line " << dowhilestmt->line <<"]: 'while' condition must evaluate to 'bool' \n";
         errors = true;
     }
 
@@ -143,7 +143,7 @@ void SemanticAnalyzer::analyzeForStmt(ASTNode* node) {
     if (forStmt->condition) {
         std::string condType = typeChecker.analyzeExpression(forStmt->condition.get());
         if (condType != "bool" && condType != "unknown") {
-            std::cerr << "Bery:Error [Line " << forStmt->line << "]: Loop condition must evaluate to 'bool'\n";
+            std::cerr <<"Bery:Error [Line " << forStmt->line <<"]: Loop condition must evaluate to 'bool'\n";
             errors = true;
         }
     }
@@ -178,7 +178,7 @@ void SemanticAnalyzer::analyzeForInStmt(ASTNode* node) {
         } else if(iterType == "string"){
             elementType = "char";
         } else if(iterType != "unknown") {
-            std::cerr << "Bery:Error [" << forIn->line <<"]: Type '" << iterType << "' is not iterable \n" ;
+            std::cerr <<"Bery:Error [" << forIn->line <<"]: Type '" << iterType <<"' is not iterable \n" ;
             errors = true;
         }
         if(actualVarType == "unknown" || actualVarType == ""){
@@ -186,7 +186,7 @@ void SemanticAnalyzer::analyzeForInStmt(ASTNode* node) {
         } else if(elementType!="unknown" && actualVarType!=elementType){
             bool compatible = (actualVarType == "float" && elementType == "int") || (actualVarType == "double" && elementType == "int") || (actualVarType == "double" && elementType == "float") || (actualVarType == "bigint" && elementType == "int");
             if(!compatible){
-                std::cerr << "Bery:Error [" << forIn->line <<"]: Type mismatched in for in loop. Variable '" << forIn->varName <<"' declared as '" << actualVarType << "' but iterable has element type '" << elementType << "' \n" ;
+                std::cerr <<"Bery:Error [" << forIn->line <<"]: Type mismatched in for in loop. Variable '" << forIn->varName <<"' declared as '" << actualVarType <<"' but iterable has element type '" << elementType <<"' \n" ;
                 errors = true;
             }
         }

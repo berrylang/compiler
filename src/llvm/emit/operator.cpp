@@ -51,23 +51,23 @@ std::string LLVMHelper::__emitBinaryOp(const std::string& op, const std::string&
 
 
     std::string resultReg = __uniqueReg();
-    outputStream << "   " << resultReg << " = " << instruction << " " << llvmType << " " << leftRegister << ", " << rightRegister << "\n";
+    outputStream <<"   " << resultReg <<" = " << instruction <<" " << llvmType <<" " << leftRegister <<", " << rightRegister <<"\n";
     return resultReg;
 }
 
-std::string LLVMHelper::__emitPow(const std::string& llvmType, bool isFloat, const std::string& lReg, const std::string& rReg, std::ostream& out) {
+std::string LLVMHelper::__emitPow(const std::string& llvmType, bool isFloat, const std::string& lReg, const std::string& rReg, std::ostream& outputStream) {
     __declareExtern("declare double @llvm.pow.f64(double, double)", "llvm.pow.f64");
     if (isFloat) {
         if (llvmType == "float") {
-            std::string left = __emitConvert("fpext", "float", lReg, "double", out);
-            std::string right = __emitConvert("fpext", "float", rReg, "double", out);
-            std::string power = __emitCall("double", "llvm.pow.f64", {{"double", left}, {"double", right}}, out);
-            return __emitConvert("fptrunc", "double", power, "float", out);
+            std::string left = __emitConvert("fpext", "float", lReg, "double", outputStream);
+            std::string right = __emitConvert("fpext", "float", rReg, "double", outputStream);
+            std::string power = __emitCall("double", "llvm.pow.f64", {{"double", left}, {"double", right}}, outputStream);
+            return __emitConvert("fptrunc", "double", power, "float", outputStream);
         }
-        return __emitCall("double", "llvm.pow.f64", {{"double", lReg}, {"double", rReg}}, out);
+        return __emitCall("double", "llvm.pow.f64", {{"double", lReg}, {"double", rReg}}, outputStream);
     }
-    std::string left = __emitConvert("sitofp", llvmType, lReg, "double", out);
-    std::string right = __emitConvert("sitofp", llvmType, rReg, "double", out);
-    std::string power = __emitCall("double", "llvm.pow.f64", {{"double", left}, {"double", right}}, out);
-    return __emitConvert("fptosi", "double", power, llvmType, out);
+    std::string left = __emitConvert("sitofp", llvmType, lReg, "double", outputStream);
+    std::string right = __emitConvert("sitofp", llvmType, rReg, "double", outputStream);
+    std::string power = __emitCall("double", "llvm.pow.f64", {{"double", left}, {"double", right}}, outputStream);
+    return __emitConvert("fptosi", "double", power, llvmType, outputStream);
 }

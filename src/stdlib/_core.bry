@@ -5,7 +5,7 @@ _core.bry
 Bery Standard Library Core Bridge
 this file is the Bery language side declaration of all BRE extern symbols.
 
-@todo: add the 'extern' keyword first and then comment-out the following block. as now it's not supported yet.
+@todo: add the 'extern' keyword first and then comment-outputStream the following block. as now it's not supported yet.
 
 
 !--

@@ -10,16 +10,16 @@ std::string LLVMHelper::__structTypeName(const std::string& className) {
 
 void LLVMHelper::__emitStructType(const std::string& structTypeName, const std::vector<std::string>&  fieldLLVMTypes) {
 
-    __STRUCTURE_declares << structTypeName << " = type { ";
+    __STRUCTURE_declares << structTypeName <<" = type { ";
     if (fieldLLVMTypes.empty()) {
-        __STRUCTURE_declares << "i8";
+        __STRUCTURE_declares <<"i8";
     }   else {
         for (size_t i = 0; i < fieldLLVMTypes.size(); i++) {
             __STRUCTURE_declares << fieldLLVMTypes[i];
-            if (i + 1 < fieldLLVMTypes.size())  __STRUCTURE_declares << ", ";
+            if (i + 1 < fieldLLVMTypes.size())  __STRUCTURE_declares <<", ";
         }
     }
-    __STRUCTURE_declares << " }\n";
+    __STRUCTURE_declares <<" }\n";
 }
 
 
@@ -28,8 +28,8 @@ void LLVMHelper::__emitClassNameGlobal(const std::string& className) {
 
     int len = (int) className.size() + 1;
 
-    __GLOBAL_STRINGS << "@.classname." << className << " = private unnamed_addr constant [" << len << " x i8] c\"" << escape << "\"\n";
-    __GLOBAL_STRINGS << "@" << className << "_typeid = global i32 0\n";
+    __GLOBAL_STRINGS <<"@.classname." << className <<" = private unnamed_addr constant [" << len <<" x i8] c\"" << escape <<"\"\n";
+    __GLOBAL_STRINGS <<"@" << className <<"_typeid = global i32 0\n";
 }
 
 
@@ -40,7 +40,7 @@ std::string LLVMHelper::__emitClassNameGEP(const std::string& className, int nam
 
 std::string LLVMHelper::__emitDestructorBitcast(const std::string& structType, const std::string& className, std::ostream& outputStream) {
     std::string reg = __uniqueReg();
-    outputStream << "   "<< reg << " = bitcast void (" << structType << "*)* @" << className<<"$destructor to i8*\n";
+    outputStream <<"   "<< reg <<" = bitcast void (" << structType <<"*)* @" << className<<"$destructor to i8*\n";
     return reg;
 }
 
@@ -49,9 +49,9 @@ std::string LLVMHelper::__emitTypeRegisterCall(const std::string& className, int
                                         const std::string& destructorArg, std::ostream& outputStream) {
     __declareExtern("declare i32 @bery_type_register(i8*, i64, i8*, i64, i8*)", "bery_type_register");
     std::string idRegister = __uniqueReg();
-    outputStream<< "    " << idRegister << " = call i32 @bery_type_register(i8* "<< __emitClassNameGEP(className, nameLen)
-    << ", i64 " << instanceSize << ", i8* null, i64 0, " << destructorArg << ")\n";
-    outputStream << "   store i32 " << idRegister << ", i32* @" << className << "_typeid\n";
+    outputStream<<"    " << idRegister <<" = call i32 @bery_type_register(i8* "<< __emitClassNameGEP(className, nameLen)
+    <<", i64 " << instanceSize <<", i8* null, i64 0, " << destructorArg <<")\n";
+    outputStream <<"   store i32 " << idRegister <<", i32* @" << className <<"_typeid\n";
     return idRegister;
 }
 

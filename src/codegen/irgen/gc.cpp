@@ -1,14 +1,14 @@
 #include "../codegen.h"
 #include <stack>
 
-void CodeGen::emitGCPush(const std::string& allocaReg, const std::string& lt, std::ostream& out) {
-    llvm.__emitGCPushCall(allocaReg, lt, out);
+void CodeGen::emitGCPush(const std::string& allocaReg, const std::string& lt, std::ostream& outputStream) {
+    llvm.__emitGCPushCall(allocaReg, lt, outputStream);
     gcRootCounter++;
     gcRootScopeStack.top()++;
 }
 
-void CodeGen::emitGCPops(int count, std::ostream& out) {
-    llvm.__emitGCPopCalls(count, out);
+void CodeGen::emitGCPops(int count, std::ostream& outputStream) {
+    llvm.__emitGCPopCalls(count, outputStream);
 }
 
 void CodeGen::pushGCScope() {

@@ -1,0 +1,20 @@
+
+run {
+
+    int arr[2] = {1,2};
+
+    --! println(arr[0]);
+    arr[0] = ++arr[0];
+    println(arr[0]);
+
+
+    Point p = new Point();
+    p.x = ++p.x;
+    println(p.x);
+ !--
+}
+
+class Point {
+    attributes[this]::
+        int x = 10;
+}
