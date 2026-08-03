@@ -55,7 +55,7 @@ std::unique_ptr<ASTNode> Parser::parse() {
                     auto decls = parseVarDecl(AccessSpecifier::PUBLIC, isConst);
                     for (auto& d : decls) program->globals.push_back(std::move(d));
                 } else {
-                    std::cerr << "Bery:Error [Line " << peek().line << "]: Unexpected token '" << peek().lexeme << "'\n";
+                    std::cerr <<"Bery:Error [Line " << peek().line <<"]: Unexpected token '" << peek().lexeme <<"'\n";
                     errors = true;
                     throw ParseError();
                 }
@@ -66,7 +66,7 @@ std::unique_ptr<ASTNode> Parser::parse() {
     }
 
     if (!program->runBlock) {
-        std::cerr << "Bery:Error: no run{} block found\n";
+        std::cerr <<"Bery:Error: no run{} block found\n";
         errors = true;
     }
     
@@ -100,7 +100,7 @@ bool Parser::check(TokenType type) {
 Token Parser::consume(TokenType type, const std::string& msg) {
     if (check(type)) return advance();
     errors = true;
-    std::cerr<< "Bery:Error [Line " << peek().line << "]: " << msg << "\n";
+    std::cerr<<"Bery:Error [Line " << peek().line <<"]: " << msg <<"\n";
     throw ParseError();
 }
 
@@ -114,9 +114,9 @@ bool Parser::isTypeToken(TokenType t) {
            t == TokenType::TOKEN_STRING; 
 }
 std::vector<std::unique_ptr<ASTNode>> Parser::single(std::unique_ptr<ASTNode> node) {
-    std::vector<std::unique_ptr<ASTNode>> out;
-    out.push_back(std::move(node));
-    return out;
+    std::vector<std::unique_ptr<ASTNode>> outputStream;
+    outputStream.push_back(std::move(node));
+    return outputStream;
 }
 std::unique_ptr<BlockNode> Parser::parseBlock() {
     int line = previous().line;
@@ -124,7 +124,7 @@ std::unique_ptr<BlockNode> Parser::parseBlock() {
     auto block = std::make_unique<BlockNode>(line);
     while(!isAtEnd() && !check(TokenType::TOKEN_RBRACE)){
         try {
-            for (auto& stmt : parseStatement()) block->statements.push_back(std::move(stmt));
+            for (auto& statement : parseStatement()) block->statements.push_back(std::move(statement));
         }
         catch(ParseError& e) {
             synchronize();

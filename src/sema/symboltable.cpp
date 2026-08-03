@@ -48,11 +48,11 @@ void SymbolTable::addVariable(const std::string& name, const std::string& type, 
     add(name, std::move(sym));
 }
 
-void SymbolTable::addFunction(const std::string& name, const std::string& returnType, std::vector<std::string> paramTypes, int line) {
+void SymbolTable::addFunction(const std::string& name, const std::string& returnType, std::vector<std::string> parameterTypes, int line) {
     Symbol sym;
     sym.symbolType = SymbolType::FUNCTION;
     sym.type = returnType;
-    sym.paramTypes = std::move(paramTypes);
+    sym.parameterTypes = std::move(parameterTypes);
     sym.line = line;
     add(name, std::move(sym));
 }
@@ -88,6 +88,6 @@ Symbol& SymbolTable::get(const std::string& name) {
         auto found = it->find(name);
         if (found != it->end()) return found->second;
     }
-    std::cerr << "Bery:'internal compiler error': symbol '" << name << "' not found in symbol table\n";
+    std::cerr <<"Bery:'internal compiler error': symbol '" << name <<"' not found in symbol table\n";
     std::abort();
 }

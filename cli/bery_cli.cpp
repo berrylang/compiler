@@ -7,10 +7,10 @@
 
 
 void printUsage() {
-    std::cerr << "Usage:\n";
-    std::cerr << "  bery compile <file.bry>   Compile to native binary\n";
-    std::cerr << "  bery run <file.bry>       Compile and run\n";
-    std::cerr << "  bery --version            Print version\n";
+    std::cerr <<"Usage:\n";
+    std::cerr <<"  bery compile <file.bry>   Compile to native binary\n";
+    std::cerr <<"  bery run <file.bry>       Compile and run\n";
+    std::cerr <<"  bery --version            Print version\n";
 }
 
 
@@ -39,7 +39,7 @@ int beryMain(int argc, char* argv[]){
         }
         return cmdRun(argv[2],ExeDir);
     }
-    std::cerr << "Bery : Error : Unknown command '" << command << "'\n";
+    std::cerr <<"Bery : Error : Unknown command '" << command <<"'\n";
     printUsage();
     return 1;
 }

@@ -26,24 +26,24 @@
 // @function signature data
 struct CodeGenFunctionSignature {
    std::string returnType;
-   std::vector<std::string> paramTypes;
+   std::vector<std::string> parameterTypes;
 };
 
 class CodeGen {
 public:
-   CodeGen(ASTNode* root, SymbolTable& symTable);
+   CodeGen(ASTNode* root, SymbolTable& symbolTable);
    // @main Codegen function, which traverse the AST after sema
    void generate(const std::string& outputPath);
 
 private:
    // @data - AST, SymbolTable
    ASTNode* root;
-   SymbolTable& symTable;
+   SymbolTable& symbolTable;
    LLVMHelper llvm;
    
 
    // @data, and literals
-   std::string llvmType(const std::string& berryType);
+   std::string llvmType(const std::string& beryType);
    std::string extractConstant(ASTNode* node);
 
 
@@ -54,52 +54,52 @@ private:
    // @functions
    std::unordered_map<std::string, CodeGenFunctionSignature> functions;
    std::string currentFuncReturn;
-   void genFuncDef(ASTNode* node, std::ostream& out);
-   void genReturnStmt(ASTNode* node, std::ostream& out);
+   void genFuncDef(ASTNode* node, std::ostream& outputStream);
+   void genReturnStmt(ASTNode* node, std::ostream& outputStream);
    
    // @garbage collector
    std::stack<int> gcRootScopeStack;
    int gcRootCounter = 0;
-   void emitGCPush(const std::string& allocaReg, const std::string& llvmType, std::ostream& out);
-   void emitGCPops(int count, std::ostream& out);
+   void emitGCPush(const std::string& allocaReg, const std::string& llvmType, std::ostream& outputStream);
+   void emitGCPops(int count, std::ostream& outputStream);
    void pushGCScope();
    int popGCScope();
    
    // @BRE
-   std::string genBREPrintCall(ASTNode* node, std::ostream& out);
+   std::string genBREPrintCall(ASTNode* node, std::ostream& outputStream);
    
    // @controlflow
-   void genBlock(ASTNode* node, std::ostream& out);
-   void genStatement(ASTNode* stmt, std::ostream& out);
-   void genBreakStmt(ASTNode* node, std::ostream& out);
-   void genContinueStmt(ASTNode* node, std::ostream& out);
+   void genBlock(ASTNode* node, std::ostream& outputStream);
+   void genStatement(ASTNode* statement, std::ostream& outputStream);
+   void genBreakStmt(ASTNode* node, std::ostream& outputStream);
+   void genContinueStmt(ASTNode* node, std::ostream& outputStream);
    
    // @declarations
-   void genVarDecl(ASTNode* node, std::ostream& out);
-   void genArrayDecl(ASTNode* node, std::ostream& out);
+   void genVarDecl(ASTNode* node, std::ostream& outputStream);
+   void genArrayDecl(ASTNode* node, std::ostream& outputStream);
    
    // @conditionals
-   void genIfStmt(ASTNode* node, std::ostream& out);
-   void genSwitchStmt(ASTNode* node, std::ostream& out);
+   void genIfStmt(ASTNode* node, std::ostream& outputStream);
+   void genSwitchStmt(ASTNode* node, std::ostream& outputStream);
 
    // @loops
-   void genDoWhileStmt(ASTNode* node, std::ostream& out);
-   void genWhileStmt(ASTNode* node, std::ostream& out);
-   void genForStmt(ASTNode* node, std::ostream& out);
-   void genForInStmt(ASTNode* node, std::ostream& out);
+   void genDoWhileStmt(ASTNode* node, std::ostream& outputStream);
+   void genWhileStmt(ASTNode* node, std::ostream& outputStream);
+   void genForStmt(ASTNode* node, std::ostream& outputStream);
+   void genForInStmt(ASTNode* node, std::ostream& outputStream);
    
    // @expression helpers
-   std::string genExpression(ASTNode* node, const std::string& expectedType, std::ostream& out);
-   std::string genLiteral(ASTNode* node, const std::string& expectedType, std::ostream& out);
-   std::string genIdentExpr(ASTNode* node, const std::string& expectedType, std::ostream& out);
-   std::string genUnaryExpr(ASTNode* node, const std::string& expectedType, std::ostream& out);
-   std::string genBetweenExpr(ASTNode* node, std::ostream& out);
-   std::string genBinaryExpr(ASTNode* node, const std::string& expectedType, std::ostream& out);
-   std::string genTernaryExpr(ASTNode* node, std::ostream& out);
-   std::string genAssignmentExpr(ASTNode* node, std::ostream& out);
-   std::string genCastExpr(ASTNode* node, std::ostream& out);
-   std::string genIndexExpr(ASTNode* node, std::ostream& out);
-   std::string genCallExpr(ASTNode* node, std::ostream& out);
+   std::string genExpression(ASTNode* node, const std::string& expectedType, std::ostream& outputStream);
+   std::string genLiteral(ASTNode* node, const std::string& expectedType, std::ostream& outputStream);
+   std::string genIdentExpr(ASTNode* node, const std::string& expectedType, std::ostream& outputStream);
+   std::string genUnaryExpr(ASTNode* node, const std::string& expectedType, std::ostream& outputStream);
+   std::string genBetweenExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genBinaryExpr(ASTNode* node, const std::string& expectedType, std::ostream& outputStream);
+   std::string genTernaryExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genAssignmentExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genCastExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genIndexExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genCallExpr(ASTNode* node, std::ostream& outputStream);
    
 
    // @oop
@@ -115,9 +115,9 @@ private:
    };
    std::unordered_map<std::string, ClassLayout> classLayouts;
    void genClassDecl(ASTNode* node);
-   std::string genNewExpr(ASTNode* node, std::ostream& out);
+   std::string genNewExpr(ASTNode* node, std::ostream& outputStream);
    std::string currentClassName = "";
-   std::string currentSelfRef   = "";
-   std::string genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& out, std::string& outType);
-   std::string genFieldChainFromAddress(std::string curPtr, std::string curType, const std::vector<std::string>& parts, std::ostream& out, std::string& outType);
+   std::string currentSelfRef = "";
+   std::string genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& outputStream, std::string& outputType);
+   std::string genFieldChainFromAddress(std::string currentPointer, std::string currentType, const std::vector<std::string>& parts, std::ostream& outputStream, std::string& outputType);
 };

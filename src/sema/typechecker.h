@@ -28,12 +28,12 @@
 
 struct FunctionSignature {
     std::string returnType;
-    std::vector<std::string> paramTypes;
+    std::vector<std::string> parameterTypes;
 };
 
 class TypeChecker {
 public:
-    TypeChecker(SymbolTable& symTable, std::unordered_map<std::string, FunctionSignature>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef);    std::string analyzeExpression(ASTNode* node);
+    TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, FunctionSignature>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef);    std::string analyzeExpression(ASTNode* node);
     bool typeMatchesLiteral(const std::string& type, NodeType litType);
 
 private:
@@ -57,11 +57,11 @@ private:
     std::string checkNewExpr(ASTNode* node);
     std::string resolveFieldType(ClassDefNode* cls, const std::string& fieldName);
     std::string resolveChainType(const std::vector<std::string>& parts, int line);
-    std::string resolveFieldChainFrom(std::string curType, const std::vector<std::string>& parts, int line);
+    std::string resolveFieldChainFrom(std::string currentType, const std::vector<std::string>& parts, int line);
     std::string resolveNumericPromotion(const std::string& lType, const std::string& rType);
 
     // @oop
     std::string& currentClass;
-    VarDeclNode* findField(ClassDefNode* cls, const std::string& fieldName);
+    ASTNode* findField(ClassDefNode* cls, const std::string& fieldName);
     bool checkMemberAccess(AccessSpecifier access, const std::string& className, const std::string& memberName, const std::string& type, int line);
 };

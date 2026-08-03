@@ -25,18 +25,18 @@ void SemanticAnalyzer::analyze() {
             auto* func = static_cast<FunctionDefNode*>(node.get());
             FunctionSignature sig;
             sig.returnType = func->returnType;
-            for (auto& p : func->parameters) sig.paramTypes.push_back(p.first);
+            for (auto& p : func->parameters) sig.parameterTypes.push_back(p.first);
             functions[func->name] = sig;
         } else if (node->type == NodeType::CLASS_DEF) {
             auto* cls = static_cast<ClassDefNode*>(node.get());
             classes[cls->name] = cls;
         } 
         else if (node->type == NodeType::EXTERN_DECL) {
-            auto* ext = static_cast<ExternDeclNode*>(node.get());
+            auto* extern_node = static_cast<ExternDeclNode*>(node.get());
             FunctionSignature sig;
-            sig.returnType = ext->returnType;
-            for (auto& p : ext->parameters) sig.paramTypes.push_back(p.first);
-            functions[ext->name] = sig;
+            sig.returnType = extern_node->returnType;
+            for (auto& p : extern_node->parameters) sig.parameterTypes.push_back(p.first);
+            functions[extern_node->name] = sig;
         }
         else if (node->type == NodeType::ENUM_DECL) {
             analyzeEnumDecl(node.get());

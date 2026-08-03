@@ -42,23 +42,23 @@ std::string CodeGen::extractConstant(ASTNode* node) {
 }
 
 
-void CodeGen::genStatement(ASTNode* stmt, std::ostream& out) {
-    if (!stmt) return;
+void CodeGen::genStatement(ASTNode* statement, std::ostream& outputStream) {
+    if (!statement) return;
     
-    if (stmt->type == NodeType::VAR_DECL) genVarDecl(stmt, out);
-    else if (stmt->type == NodeType::ARRAY_DECL) genArrayDecl(stmt, out);
-    else if (stmt->type == NodeType::ASSIGNMENT_EXPR || stmt->type == NodeType::UNARY_EXPR ||stmt->type == NodeType::CALL_EXPR) genExpression(stmt, "any", out);
-    else if (stmt->type == NodeType::IF_STMT) genIfStmt(stmt, out);
-    else if (stmt->type == NodeType::WHILE_STMT) genWhileStmt(stmt, out);
-    else if (stmt->type == NodeType::DOWHILE_STMT) genDoWhileStmt(stmt, out);
-    else if (stmt->type == NodeType::SWITCH_STMT) genSwitchStmt(stmt, out);
-    else if (stmt->type == NodeType::BREAK_STMT) genBreakStmt(stmt, out);
-    else if (stmt->type == NodeType::BLOCK) genBlock(stmt, out);
-    else if (stmt->type == NodeType::PASS_STMT) {}
-    else if (stmt->type == NodeType::CONTINUE_STMT) genContinueStmt(stmt, out);
-    else if (stmt->type == NodeType::RETURN_STMT) genReturnStmt(stmt, out);
-    else if (stmt->type == NodeType::ENUM_DECL) {
-        auto* enumDecl = static_cast<EnumDeclNode*>(stmt);
+    if (statement->type == NodeType::VAR_DECL) genVarDecl(statement, outputStream);
+    else if (statement->type == NodeType::ARRAY_DECL) genArrayDecl(statement, outputStream);
+    else if (statement->type == NodeType::ASSIGNMENT_EXPR || statement->type == NodeType::UNARY_EXPR ||statement->type == NodeType::CALL_EXPR) genExpression(statement, "any", outputStream);
+    else if (statement->type == NodeType::IF_STMT) genIfStmt(statement, outputStream);
+    else if (statement->type == NodeType::WHILE_STMT) genWhileStmt(statement, outputStream);
+    else if (statement->type == NodeType::DOWHILE_STMT) genDoWhileStmt(statement, outputStream);
+    else if (statement->type == NodeType::SWITCH_STMT) genSwitchStmt(statement, outputStream);
+    else if (statement->type == NodeType::BREAK_STMT) genBreakStmt(statement, outputStream);
+    else if (statement->type == NodeType::BLOCK) genBlock(statement, outputStream);
+    else if (statement->type == NodeType::PASS_STMT) {}
+    else if (statement->type == NodeType::CONTINUE_STMT) genContinueStmt(statement, outputStream);
+    else if (statement->type == NodeType::RETURN_STMT) genReturnStmt(statement, outputStream);
+    else if (statement->type == NodeType::ENUM_DECL) {
+        auto* enumDecl = static_cast<EnumDeclNode*>(statement);
         int currentValue = 0;
         
         for (const auto& val : enumDecl->values) {
@@ -75,11 +75,11 @@ void CodeGen::genStatement(ASTNode* stmt, std::ostream& out) {
             sym.line = enumDecl->line;
             sym.llvmRegister = memReg;
             sym.llvmAllocType = lt;
-            symTable.add(mangledName, sym);
-            out << "    " << memReg << " = alloca " << lt << "\n";
-            llvm.__emitStore(lt, std::to_string(currentValue++), memReg, out);
+            symbolTable.add(mangledName, sym);
+            outputStream <<"    " << memReg <<" = alloca " << lt <<"\n";
+            llvm.__emitStore(lt, std::to_string(currentValue++), memReg, outputStream);
         }
     }
-    else if (stmt->type == NodeType::FOR_STMT) genForStmt(stmt, out);
-    else if (stmt->type == NodeType::FOR_IN_STMT) genForInStmt(stmt, out);
+    else if (statement->type == NodeType::FOR_STMT) genForStmt(statement, outputStream);
+    else if (statement->type == NodeType::FOR_IN_STMT) genForInStmt(statement, outputStream);
 }
