@@ -931,6 +931,44 @@ std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& outputStream) {
     return objReg;
 }
 
+
+std::string CodeGen::genRefExpr(ASTNode* node, const std::string& expectedType,std::ostream& outputStream) {
+    auto* refNode = static_cast<RefExprNode*>(node);
+    return genExpression(refNode->target.get(), expectedType, outputStream);
+}
+
+
+std::string CodeGen::genClassCopyValue(ASTNode* valueNode, const std::string& classType, std::ostream& outputStream) {
+    std::string srcReg = genExpression(valueNode, classType, outputStream);
+
+    if (valueNode->type == NodeType::REF_EXPR || valueNode->type == NodeType::NEW_EXPR) {
+        return srcReg;
+    }
+
+    return cloneClassInstance(classType, srcReg, outputStream);
+}
+
+std::string CodeGen::cloneClassInstance(const std::string& classType, const std::string& srcRegister, std::ostream& outputStream){
+    std::string lt = llvmType(classType); // "" classname
+    ClassLayout& layout = classLayouts.at(classType);
+
+    // i8 - character
+    // i8* - string
+    // i8** - identifier
+    // i8* bery_alloc(i64, i32) {}
+    llvm.__declareExternFn("i8*", "bery_alloc", {"i64", "i32"});
+    // @Car._typeid
+    std::string typeIdeReg = llvm.__emitLoad("i32", llvm.__globalRef(classType, "_typeid"), outputStream);
+    std::string rawReg = llvm.__emitCall("i8*", "bery_alloc", {{"i64", std::to_string(layout.instanceSize)}, {"i32", typeIdeReg}}, outputStream);
+
+    std::string srcBytes = llvm.__emitBitcast(lt, srcRegister, "i8*", outputStream);
+    llvm.__declareExternFn("i8*", "memcpy", {"i8*", "i8*", "i64"});
+    llvm.__emitCall("i8*", "memcpy", {{"i8*", rawReg}, {"i8*", srcBytes}, {"i64", std::to_string(layout.instanceSize)}}, outputStream);
+
+    return llvm.__emitBitcast("i8*", rawReg, lt, outputStream);
+}
+
+
 std::string CodeGen::genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& outputStream, std::string& outputType) {
     Symbol& base = symbolTable.get(parts[0]);
     std::vector<std::string> rest(parts.begin() + 1, parts.end());
@@ -969,6 +1007,7 @@ std::string CodeGen::genExpression(ASTNode* node, const std::string& expectedTyp
         case NodeType::INDEX_EXPR:      return genIndexExpr(node, outputStream);
         case NodeType::CALL_EXPR:       return genCallExpr(node, outputStream);
         case NodeType::NEW_EXPR:        return genNewExpr(node, outputStream);
+        case NodeType::REF_EXPR:        return genRefExpr(node, expectedType, outputStream);
         default:                        return "0";
     }
 }
