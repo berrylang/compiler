@@ -213,6 +213,11 @@ std::unique_ptr<ASTNode> Parser::parsePostfix(){
 
 std::unique_ptr<ASTNode> Parser::parsePrimary(){
     Token t = peek();
+    if(t.type == TokenType::TOKEN_REF){
+        advance();
+        auto target = parsePrimary();
+        return std::make_unique<RefExprNode>(std::move(target),t.line);
+    }
     if (t.type == TokenType::TOKEN_NEW) {
         advance();
         Token className = consume(TokenType::TOKEN_IDENT, "Expected class name after 'new'");
