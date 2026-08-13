@@ -474,7 +474,7 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
                     targetBerryType = finalType;
                 } else {
                     llvm.__declareExternFn("void", "bery_array_set", {"i8*", "i64", "i8*"});
-                    std::string valReg = genExpression(assign->value.get(), elemType, outputStream);
+                    std::string valReg = classLayouts.count(elemType)? genClassCopyValue(assign->value.get(), elemType, outputStream): genExpression(assign->value.get(), elemType, outputStream);
                     std::string boxedReg = llvm.__emitBoxValue(lt, valReg, outputStream);
                     llvm.__emitCall("void", "bery_array_set", {{"i8*", arrReg}, {"i64", idxExt}, {"i8*", boxedReg}}, outputStream);
                     return valReg;
@@ -518,7 +518,8 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
         }
     } 
 
-    std::string valReg = genExpression(assign->value.get(), targetBerryType, outputStream);
+    std::string valReg = classLayouts.count(targetBerryType) ?genClassCopyValue(assign->value.get(), targetBerryType, outputStream)
+        : genExpression(assign->value.get(), targetBerryType, outputStream);
 
     if (assign->op == "=") {
         llvm.__emitStore(targetLT, valReg, memPtr, outputStream);
@@ -771,7 +772,7 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
             
             if (method == "push") {
                 llvm.__declareExternFn("void", "bery_array_push", {"i8*", "i8*"});
-                std::string valReg = genExpression(call->arguments[0].get(), elemType, outputStream);
+                std::string valReg = classLayouts.count(elemType)? genClassCopyValue(call->arguments[0].get(), elemType, outputStream): genExpression(call->arguments[0].get(), elemType, outputStream);
                 std::string castReg = llvm.__emitBoxValue(lt, valReg, outputStream);
                 llvm.__emitCall("void", "bery_array_push", {{"i8*", arrReg}, {"i8*", castReg}}, outputStream);
                 return "0";
@@ -786,7 +787,7 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
                 llvm.__declareExternFn("void", "bery_array_insert", {"i8*", "i64", "i8*"});
                 std::string idxReg = genExpression(call->arguments[0].get(), "int", outputStream);
                 std::string idxExt = llvm.__emitSext("i32", idxReg, "i64", outputStream);
-                std::string valReg = genExpression(call->arguments[1].get(), elemType, outputStream);
+                std::string valReg = classLayouts.count(elemType) ? genClassCopyValue(call->arguments[1].get(), elemType, outputStream): genExpression(call->arguments[1].get(), elemType, outputStream);
                 std::string castReg = llvm.__emitBoxValue(lt, valReg, outputStream);
                 llvm.__emitCall("void", "bery_array_insert", {{"i8*", arrReg}, {"i64", idxExt}, {"i8*", castReg}}, outputStream);
                 return "0";
@@ -842,7 +843,7 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
 
     std::vector<std::pair<std::string, std::string>> args;
     for (size_t i = 0; i < call->arguments.size(); ++i) {
-        std::string argReg = genExpression(call->arguments[i].get(), sig.parameterTypes[i], outputStream);
+         std::string argReg = classLayouts.count(sig.parameterTypes[i])? genClassCopyValue(call->arguments[i].get(), sig.parameterTypes[i], outputStream): genExpression(call->arguments[i].get(), sig.parameterTypes[i], outputStream);
         args.push_back({llvmType(sig.parameterTypes[i]), argReg});
     }
 
@@ -872,7 +873,7 @@ std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& outputStream) {
             auto* varDecl = static_cast<VarDeclNode*>(declNode);
             std::string flt = llvmType(varDecl->varType);
             if (varDecl->value) {
-                std::string valReg = genExpression(varDecl->value.get(), varDecl->varType, outputStream);
+                std::string valReg = classLayouts.count(varDecl->varType)? genClassCopyValue(varDecl->value.get(), varDecl->varType, outputStream) : genExpression(varDecl->value.get(), varDecl->varType, outputStream);
                 llvm.__emitStore(flt, valReg, gepReg, outputStream);
             } else {
                 bool isPtr = !flt.empty() && flt.back() == '*';
@@ -922,7 +923,8 @@ std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& outputStream) {
         std::vector<std::pair<std::string, std::string>> args;
         args.push_back({llvm.__pointerType(layout.llvmStructType), objReg});
         for (size_t i = 0; i < newExpr->arguments.size(); ++i) {
-            std::string argReg = genExpression(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream);
+            std::string argReg = classLayouts.count(sig.parameterTypes[i + 1])? genClassCopyValue(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream)
+                : genExpression(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream);
             args.push_back({llvmType(sig.parameterTypes[i + 1]), argReg});
         }
         llvm.__emitCall("void", mangled, args, outputStream);
