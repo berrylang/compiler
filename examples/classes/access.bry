@@ -1,6 +1,6 @@
 class Car {
     attributes[hello]::
-        public int a;
+        public int ab;
         private string name = "Bery";
     methods::
         public func setA(int x) {

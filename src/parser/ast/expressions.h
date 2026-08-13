@@ -127,3 +127,11 @@ struct NewExprNode : public ASTNode {
         line = ln;
     }
 };
+
+struct RefExprNode : public ASTNode{
+    std::unique_ptr<ASTNode> target;
+    RefExprNode(std::unique_ptr<ASTNode> expr,int ln): target(std::move(expr)){
+        type = NodeType::REF_EXPR;
+        line = ln;
+    }
+};

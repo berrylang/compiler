@@ -1,0 +1,17 @@
+
+class Car {
+    attributes[this]::
+        public int a = 10;
+}
+
+run {
+    Car obj = new Car();
+
+    Car obj2 = obj;
+    obj2.a = 20;
+    println(obj.a);
+
+    Car obj3 = ref obj;
+    obj3.a = 30;
+    println(obj.a);
+}

@@ -100,6 +100,7 @@ private:
    std::string genCastExpr(ASTNode* node, std::ostream& outputStream);
    std::string genIndexExpr(ASTNode* node, std::ostream& outputStream);
    std::string genCallExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genRefExpr(ASTNode* node, const std::string& expectedType, std::ostream& outputStream);
    
 
    // @oop
@@ -116,6 +117,8 @@ private:
    std::unordered_map<std::string, ClassLayout> classLayouts;
    void genClassDecl(ASTNode* node);
    std::string genNewExpr(ASTNode* node, std::ostream& outputStream);
+   std::string genClassCopyValue(ASTNode* valueNode, const std::string& classType, std::ostream& outputStream);
+   std::string cloneClassInstance(const std::string& classType, const std::string& srcRegister, std::ostream& outputStream);
    std::string currentClassName = "";
    std::string currentSelfRef = "";
    std::string genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& outputStream, std::string& outputType);

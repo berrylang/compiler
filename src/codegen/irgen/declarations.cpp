@@ -185,7 +185,7 @@ void CodeGen::genVarDecl(ASTNode* node, std::ostream& outputStream) {
         emitGCPush(memoryReg, lt, outputStream);
     }
     if (!decl->value) return;
-    std::string valueReg = genExpression(decl->value.get(), decl->varType, outputStream);
+    std::string valueReg = classLayouts.count(decl->varType)? genClassCopyValue(decl->value.get(), decl->varType, outputStream): genExpression(decl->value.get(), decl->varType, outputStream);
     llvm.__emitStore(lt, valueReg, memoryReg, outputStream);
 }
 
@@ -213,7 +213,7 @@ void CodeGen::genArrayDecl(ASTNode* node, std::ostream& outputStream) {
                 std::string lt = llvmType(decl->elementType);
                 llvm.__declareExternFn("void", "bery_array_push", {"i8*", "i8*"});
                 for (auto& initVal : decl->initializers) {
-                    std::string valReg = genExpression(initVal.get(), decl->elementType, outputStream);
+                    std::string valReg = classLayouts.count(decl->elementType) ? genClassCopyValue(initVal.get(), decl->elementType, outputStream): genExpression(initVal.get(), decl->elementType, outputStream);
                     std::string boxedReg = llvm.__emitBoxValue(lt, valReg, outputStream);
                     llvm.__emitCall("void", "bery_array_push", {{"i8*", arrReg}, {"i8*", boxedReg}}, outputStream);
                 }
@@ -245,7 +245,7 @@ void CodeGen::genArrayDecl(ASTNode* node, std::ostream& outputStream) {
 
     std::string flatPtr = llvm.__emitBitcast(llvm.__pointerType(arrType), memReg, llvm.__pointerType(lt), outputStream);
     for (size_t i = 0; i < decl->initializers.size(); ++i) {
-        std::string valReg = genExpression(decl->initializers[i].get(), decl->elementType, outputStream);
+       std::string valReg = classLayouts.count(decl->elementType) ? genClassCopyValue(decl->initializers[i].get(), decl->elementType, outputStream) : genExpression(decl->initializers[i].get(), decl->elementType, outputStream);
         std::string ptrReg = llvm.__emitTypedGEP(lt, flatPtr, {{"i32", std::to_string(i)}}, false, outputStream);
         llvm.__emitStore(lt, valReg, ptrReg, outputStream);
     }
@@ -305,7 +305,9 @@ void CodeGen::genReturnStmt(ASTNode* node, std::ostream& outputStream) {
     auto* retNode = static_cast<ReturnStmtNode*>(node);
     
     std::string valueReg;
-    if (retNode->value) {valueReg = genExpression(retNode->value.get(), currentFuncReturn, outputStream); }
+    if (retNode->value) {
+        valueReg = classLayouts.count(currentFuncReturn)? genClassCopyValue(retNode->value.get(), currentFuncReturn, outputStream)
+            : genExpression(retNode->value.get(), currentFuncReturn, outputStream); }
     int totalRoots = 0;
     std::stack<int> tempStack = gcRootScopeStack;
     while (!tempStack.empty()) {

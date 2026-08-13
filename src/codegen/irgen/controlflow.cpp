@@ -330,6 +330,9 @@ void CodeGen::genForInStmt(ASTNode* node, std::ostream& outputStream) {
                     finalReg = llvm.__emitConvert("fpext", "float", valReg, "double", outputStream);
                 }
             }
+            if (classLayouts.count(elementType)){
+                finalReg = cloneClassInstance(elementType, finalReg, outputStream);
+            }
             llvm.__emitStore(lt, finalReg, varReg, outputStream);
 
             breakTracker.push_back(endLabel);
@@ -404,6 +407,9 @@ void CodeGen::genForInStmt(ASTNode* node, std::ostream& outputStream) {
 
             std::string gepReg = llvm.__emitTypedGEP(lt, arrPtr, {{idxType, currIdxReg}}, true, outputStream);
             std::string valReg = llvm.__emitLoad(lt, gepReg, outputStream);
+            if (classLayouts.count(forIn->varType)) {
+                valReg = cloneClassInstance(forIn->varType, valReg, outputStream);
+            }
             llvm.__emitStore(lt, valReg, varReg, outputStream);
 
             breakTracker.push_back(endLabel);
