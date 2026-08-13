@@ -58,6 +58,7 @@ std::string TypeChecker::analyzeExpression(ASTNode* node) {
         case NodeType::CAST_EXPR:       return checkCastExpr(node);
         case NodeType::IDENT:           return checkIdentifier(node);
         case NodeType::NEW_EXPR:        return checkNewExpr(node);
+        case NodeType::REF_EXPR:        return checkRefExpr(node);
         default:                        return checkLiteral(node);
     }
 }
@@ -762,6 +763,18 @@ std::string TypeChecker::checkNewExpr(ASTNode* node) {
     return newExpr->resolvedType;
 }
 
+std::string TypeChecker::checkRefExpr(ASTNode* node) {
+    auto* refNode = static_cast<RefExprNode*>(node);
+    if (refNode->target->type != NodeType::IDENT && refNode->target->type != NodeType::INDEX_EXPR) {
+        std::cerr <<"Bery:Error [Line " << refNode->line <<"]: 'ref' can only be used on a variable, field, or array element\n";
+        errors = true;
+        refNode->resolvedType = "unknown";
+        return refNode->resolvedType;
+    }
+    std::string targetType = analyzeExpression(refNode->target.get());
+    refNode->resolvedType = targetType;
+    return refNode->resolvedType;
+}
 
 std::string TypeChecker::resolveFieldType(ClassDefNode* cls, const std::string& fieldName) {
     ASTNode* field = findField(cls, fieldName);
