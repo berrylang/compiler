@@ -76,5 +76,6 @@ private:
    // @oop
    std::unordered_map<std::string, ClassDefNode*> classes;
    std::string currentClassContext = "";
+   bool isValidInheritance(ClassDefNode* cls);
    void analyzeClassDecl(ASTNode* node);
 };

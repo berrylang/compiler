@@ -234,7 +234,29 @@ void SemanticAnalyzer::analyzeEnumDecl(ASTNode* node) {
 
 void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
     auto* cls = static_cast<ClassDefNode*>(node);
-
+    if (!cls->parentName.empty()) {
+        if (cls->parentName == cls->name) {
+            std::cerr << "Bery:Error [Line " << cls->line << "]: Class '" << cls->name << "' cannot inherit from itself\n";
+            errors = true;
+        } else if (!classes.count(cls->parentName)) {
+            std::cerr << "Bery:Error [Line " << cls->line << "]: Unknown parent class '" << cls->parentName << "' for class '" << cls->name << "'\n";
+            errors = true;
+        } else {
+            std::unordered_set<std::string> visited;
+            std::string cur = cls->parentName;
+            while (!cur.empty()) {
+                if (cur == cls->name) {
+                    std::cerr << "Bery:Error [Line " << cls->line << "]: Circular inheritance detected involving class '" << cls->name << "'\n";
+                    errors = true;
+                    break;
+                }
+                if (visited.count(cur)) break; 
+                visited.insert(cur);
+                auto it = classes.find(cur);
+                cur = (it != classes.end()) ? it->second->parentName : "";
+            }
+        }
+    }
     std::unordered_set<std::string> seen;
     if (cls->attributes) {
         for (auto& attr : cls->attributes->attributes) {

@@ -9,6 +9,13 @@ std::unique_ptr<ASTNode> Parser::parseClassDecl() {
     advance();
     int line = previous().line;
     Token className = consume(TokenType::TOKEN_IDENT, "Expected class name");
+
+    std::string parentName = "";
+    if (check(TokenType::TOKEN_COLON)) {
+        advance();
+        Token parentToken = consume(TokenType::TOKEN_IDENT, "Expected parent class name after ':'");
+        parentName = parentToken.lexeme;
+    }
     consume(TokenType::TOKEN_LBRACE, "Expected '{' after class name");
     
     auto attrSection = parseAttributeSection();
@@ -18,7 +25,7 @@ std::unique_ptr<ASTNode> Parser::parseClassDecl() {
         methodSection = parseMethodSection(className.lexeme);
     }
     consume(TokenType::TOKEN_RBRACE, "Expected '}' after class body");
-    return std::make_unique<ClassDefNode>(className.lexeme, std::move(attrSection), std::move(methodSection), line);
+    return std::make_unique<ClassDefNode>(className.lexeme, parentName, std::move(attrSection), std::move(methodSection), line);
 }
 
 std::unique_ptr<AttributeSectionNode> Parser::parseAttributeSection() {
