@@ -106,15 +106,19 @@ private:
    // @oop
    struct ClassLayout {
       std::string name;
+      std::string parentName;
       std::vector<std::pair<std::string, std::string>> fields;
       std::string llvmStructType; 
       std::unordered_map<std::string, int> fieldIndex;
       size_t instanceSize = 0;
       std::vector<ASTNode*> fieldInitializers;
       bool hasConstructor = false;
+      std::string constructorOwner = "";
       bool hasDestructor = false;
+      std::string destructorOwner = "";
    };
    std::unordered_map<std::string, ClassLayout> classLayouts;
+   std::string findMethodOwner(const std::string& className, const std::string& methodName);
    void genClassDecl(ASTNode* node);
    std::string genNewExpr(ASTNode* node, std::ostream& outputStream);
    std::string genClassCopyValue(ASTNode* valueNode, const std::string& classType, std::ostream& outputStream);

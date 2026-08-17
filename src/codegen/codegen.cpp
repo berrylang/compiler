@@ -35,6 +35,28 @@ void CodeGen::generate(const std::string& outputPath) {
     globalsOutputStream <<"declare void @bery_runtime_startup()\n";
     globalsOutputStream <<"declare void @bery_runtime_shutdown()\n";
 
+    std::vector<ASTNode*> classNodes;
+    for (auto& node : program->globals)
+        if (node->type == NodeType::CLASS_DEF) classNodes.push_back(node.get());
+
+    std::vector<ASTNode*> orderedClasses;
+    std::unordered_set<std::string> emittedClasses;
+    std::function<void(ASTNode*)> emitClassInOrder = [&](ASTNode* n) {
+        auto* cls = static_cast<ClassDefNode*>(n);
+        if (emittedClasses.count(cls->name)) return;
+        if (!cls->parentName.empty()) {
+            for (auto* p : classNodes) {
+                if (static_cast<ClassDefNode*>(p)->name == cls->parentName) {
+                    emitClassInOrder(p);
+                    break;
+                }
+            }
+        }
+        emittedClasses.insert(cls->name);
+        orderedClasses.push_back(n);
+    };
+    for (auto* n : classNodes) emitClassInOrder(n);
+
     for (auto& node : program->globals) {
         if (node->type == NodeType::FUNC_DEF) {
             auto* func = static_cast<FunctionDefNode*>(node.get());
@@ -57,10 +79,10 @@ void CodeGen::generate(const std::string& outputPath) {
             }
             functions[extern_node->name] = signature;
             globalsOutputStream << llvm.__formatDeclare(llvmType(extern_node->returnType), extern_node->name, parameterLLVMTypes) <<"\n";
-        }else if (node->type == NodeType::CLASS_DEF) {
-            genClassDecl(node.get());
         }
     }
+
+    for (auto* n : orderedClasses) genClassDecl(n);
 
     for (auto& node : program->globals) {
         if (node->type == NodeType::VAR_DECL) {
@@ -151,7 +173,8 @@ void CodeGen::generate(const std::string& outputPath) {
         int nameLen = (int)cl.name.length() + 1;
         std::string destructorArg = "i8* null";
         if (cl.hasDestructor) {
-            std::string dtorReg = llvm.__emitDestructorBitcast(cl.llvmStructType, cl.name, body);
+            std::string ownerStructType = classLayouts.at(cl.destructorOwner).llvmStructType;
+            std::string dtorReg = llvm.__emitDestructorBitcast(ownerStructType, cl.destructorOwner, body);
             destructorArg = "i8* " + dtorReg;
         }
         llvm.__emitTypeRegisterCall(cl.name, nameLen, (long long)cl.instanceSize, destructorArg, body);

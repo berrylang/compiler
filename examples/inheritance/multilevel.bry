@@ -1,0 +1,27 @@
+
+
+class A {
+    attributes[this]::
+        int a = 10;
+}
+
+class B : A {
+    attributes[mine]::
+    methods::
+    public func my_func() -> int {
+        return 34;
+    }
+}
+
+class C : B {
+    attributes[me]::
+        int b = 40;
+}
+
+run {
+    C obj = new C();
+
+    println(obj.a);
+    println(obj.my_func());
+    println(obj.b);
+}

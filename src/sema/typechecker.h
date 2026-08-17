@@ -24,6 +24,7 @@
 #include "../parser/ast/classes.h"
 #include "../parser/ast/accessSpecifier.h"
 #include "../parser/ast/vardecl.h"
+#include "../parser/ast/functions.h"
 
 
 struct FunctionSignature {
@@ -64,5 +65,6 @@ private:
     // @oop
     std::string& currentClass;
     ASTNode* findField(ClassDefNode* cls, const std::string& fieldName);
+    FunctionDefNode* findMethod(ClassDefNode* cls, const std::string& methodName);
     bool checkMemberAccess(AccessSpecifier access, const std::string& className, const std::string& memberName, const std::string& type, int line);
 };

@@ -12,31 +12,49 @@ void CodeGen::genClassDecl(ASTNode* node) {
 
     ClassLayout layout;
     layout.name = cls->name;
+    layout.parentName = cls->parentName;
     layout.llvmStructType = llvm.__structTypeName(cls->name);
 
     std::vector<std::string> fieldTypes;
-    if (cls->attributes) {
-    for (size_t i = 0; i < cls->attributes->attributes.size(); ++i) {
-        auto* attr = cls->attributes->attributes[i].get();
-        if (attr->type == NodeType::VAR_DECL) {
-            auto* field = static_cast<VarDeclNode*>(attr);
-            std::string lt = llvmType(field->varType);
-            layout.fields.push_back({field->varType, field->name});
-            layout.fieldIndex[field->name] = (int)i;
-            layout.fieldInitializers.push_back(field);
-            fieldTypes.push_back(lt);
-        } else if (attr->type == NodeType::ARRAY_DECL) {
-            auto* field = static_cast<ArrayDeclNode*>(attr);
-            std::string beryType = "array<" + field->elementType + ">";
-            std::string lt = (field->dimensions.size() == 1 && field->dimensions[0] == -1) ? "i8*": llvm.__nestedArrayType(llvmType(field->elementType), field->dimensions);
-                
-            layout.fields.push_back({beryType, field->name});
-            layout.fieldIndex[field->name] = (int)i;
-            layout.fieldInitializers.push_back(field); 
-            fieldTypes.push_back(lt);
+    if (!cls->parentName.empty() && classLayouts.count(cls->parentName)) {
+        ClassLayout& parentLayout = classLayouts.at(cls->parentName);
+        layout.fields = parentLayout.fields;
+        layout.fieldIndex = parentLayout.fieldIndex;
+        layout.fieldInitializers = parentLayout.fieldInitializers;
+        for (auto* declNode : parentLayout.fieldInitializers) {
+            if (declNode->type == NodeType::VAR_DECL) {
+                fieldTypes.push_back(llvmType(static_cast<VarDeclNode*>(declNode)->varType));
+            } else {
+                auto* arrDecl = static_cast<ArrayDeclNode*>(declNode);
+                std::string lt = (arrDecl->dimensions.size() == 1 && arrDecl->dimensions[0] == -1)
+                    ? "i8*" : llvm.__nestedArrayType(llvmType(arrDecl->elementType), arrDecl->dimensions);
+                fieldTypes.push_back(lt);
+            }
         }
     }
-}
+
+    if (cls->attributes) {
+        for (size_t i = 0; i < cls->attributes->attributes.size(); ++i) {
+            auto* attr = cls->attributes->attributes[i].get();
+            if (attr->type == NodeType::VAR_DECL) {
+                auto* field = static_cast<VarDeclNode*>(attr);
+                std::string lt = llvmType(field->varType);
+                layout.fieldIndex[field->name] = (int)layout.fields.size();
+                layout.fields.push_back({field->varType, field->name});
+                layout.fieldInitializers.push_back(field);
+                fieldTypes.push_back(lt);
+            } else if (attr->type == NodeType::ARRAY_DECL) {
+                auto* field = static_cast<ArrayDeclNode*>(attr);
+                std::string beryType = "array<" + field->elementType + ">";
+                std::string lt = (field->dimensions.size() == 1 && field->dimensions[0] == -1)
+                    ? "i8*" : llvm.__nestedArrayType(llvmType(field->elementType), field->dimensions);
+                layout.fieldIndex[field->name] = (int)layout.fields.size();
+                layout.fields.push_back({beryType, field->name});
+                layout.fieldInitializers.push_back(field);
+                fieldTypes.push_back(lt);
+            }
+        }
+    }
     llvm.__emitStructType(layout.llvmStructType, fieldTypes);
 
     layout.instanceSize = 0;

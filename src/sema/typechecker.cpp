@@ -319,14 +319,7 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
         auto classIt = classes.find(objType);
         if (classIt != classes.end()) {
             ClassDefNode* cls = classIt->second;
-            FunctionDefNode* methodDef = nullptr;
-            if (cls->methods) {
-                for (auto& m : cls->methods->methods) {
-                    auto* f = static_cast<FunctionDefNode*>(m.get());
-                    if (f->isConstructor || f->isDestructor) continue;
-                    if (f->name == method) { methodDef = f; break; }
-                }
-            }
+            FunctionDefNode* methodDef = findMethod(cls, method);
             if (!methodDef) {
                 std::cerr <<"Bery:Error [Line " << call->line <<"]: Class '" << objType <<"' has no method '" << method <<"'\n";
                 errors = true;
@@ -369,11 +362,9 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
 
     if (!currentClass.empty()) {
         auto selfClassIt =classes.find(currentClass);
-        if (selfClassIt != classes.end() && selfClassIt->second->methods) {
-            for (auto& m : selfClassIt->second->methods->methods) {
-                auto* f = static_cast<FunctionDefNode*>(m.get());
-                if (f->isConstructor || f->isDestructor) continue;
-                if (f->name != call->callee) continue;
+        if (selfClassIt != classes.end()) {
+            FunctionDefNode* f = findMethod(selfClassIt->second, call->callee);
+            if (f) {
                 if (f->parameters.size() != call->arguments.size()) {
                     std::cerr <<"Bery:Error [Line " << call->line <<"]: Method '" << call->callee <<"' expects "<< f->parameters.size() <<" arguments, got " << call->arguments.size() <<"\n";
                     errors = true;
@@ -785,15 +776,35 @@ std::string TypeChecker::resolveFieldType(ClassDefNode* cls, const std::string& 
 }
 
 ASTNode* TypeChecker::findField(ClassDefNode* cls, const std::string& fieldName) {
-    if(!cls->attributes) {return nullptr;}
-    for(auto& attrNode :cls->attributes->attributes) {
-        if (attrNode->type == NodeType::VAR_DECL) {
-            auto* field = static_cast<VarDeclNode*>(attrNode.get());
-            if (field->name == fieldName) return field;
-        } else if (attrNode->type == NodeType::ARRAY_DECL) {
-            auto* field = static_cast<ArrayDeclNode*>(attrNode.get());
-            if (field->name == fieldName) return field;
+    if (cls->attributes) {
+        for (auto& attrNode : cls->attributes->attributes) {
+            if (attrNode->type == NodeType::VAR_DECL) {
+                auto* field = static_cast<VarDeclNode*>(attrNode.get());
+                if (field->name == fieldName) return field;
+            } else if (attrNode->type == NodeType::ARRAY_DECL) {
+                auto* field = static_cast<ArrayDeclNode*>(attrNode.get());
+                if (field->name == fieldName) return field;
+            }
         }
+    }
+    if (!cls->parentName.empty()) {
+        auto it = classes.find(cls->parentName);
+        if (it != classes.end()) return findField(it->second, fieldName);
+    }
+    return nullptr;
+}
+
+FunctionDefNode* TypeChecker::findMethod(ClassDefNode* cls, const std::string& methodName) {
+    if (cls->methods) {
+        for (auto& m : cls->methods->methods) {
+            auto* f = static_cast<FunctionDefNode*>(m.get());
+            if (f->isConstructor || f->isDestructor) continue;
+            if (f->name == methodName) return f;
+        }
+    }
+    if (!cls->parentName.empty()) {
+        auto it = classes.find(cls->parentName);
+        if (it != classes.end()) return findMethod(it->second, methodName);
     }
     return nullptr;
 }
@@ -801,8 +812,16 @@ ASTNode* TypeChecker::findField(ClassDefNode* cls, const std::string& fieldName)
 bool TypeChecker::checkMemberAccess(AccessSpecifier access, const std::string& className, const std::string& memberName, const std::string& type, int line) {
     if (access == AccessSpecifier::PUBLIC) return true;
     if (currentClass == className) return true;
+    if (access == AccessSpecifier::PROTECTED && !currentClass.empty()) {
+        std::string cur = currentClass;
+        while (!cur.empty()) {
+            if (cur == className) return true;
+            auto it = classes.find(cur);
+            cur = (it != classes.end()) ? it->second->parentName : "";
+        }
+    }
     std::string levelName = (access == AccessSpecifier::PRIVATE) ? "private" : "protected";
-    std::cerr <<"Bery:Error [Line " << line <<"]: Cannot access " << levelName <<" " << type <<" '"<< memberName <<"' of class '" << className <<"' from outside the class\n";
+    std::cerr << "Bery:Error [Line " << line << "]: Cannot access " << levelName << " " << type << " '" << memberName << "' of class '" << className << "' from outside the class\n";
     errors = true;
     return false;
 }

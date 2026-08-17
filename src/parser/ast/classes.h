@@ -27,11 +27,12 @@ struct MethodSectionNode : public ASTNode {
 
 struct ClassDefNode : public ASTNode {
     std::string name;
+    std::string parentName;
     std::unique_ptr<AttributeSectionNode> attributes;
     std::unique_ptr<MethodSectionNode> methods;
 
-    ClassDefNode(std::string n, std::unique_ptr<AttributeSectionNode> attr, std::unique_ptr<MethodSectionNode> meth, int ln)
-        : name(std::move(n)), attributes(std::move(attr)), methods(std::move(meth)) {
+    ClassDefNode(std::string n, std::string parent, std::unique_ptr<AttributeSectionNode> attr, std::unique_ptr<MethodSectionNode> meth, int ln)
+        : name(std::move(n)),parentName(std::move(parent)), attributes(std::move(attr)), methods(std::move(meth)) {
         type = NodeType::CLASS_DEF;
         line = ln;
     }
