@@ -386,7 +386,7 @@ std::string CodeGen::genTernaryExpr(ASTNode* node, std::ostream& outputStream) {
 
 std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream) {
     auto* assign = static_cast<AssignmentExprNode*>(node);
-    std::string targetLT, memPtr, targetBerryType;
+    std::string targetLT, memPtr, targetberyType;
 
     if (assign->target->type == NodeType::IDENT) {
         auto* ident = static_cast<IdentNode*>(assign->target.get());
@@ -400,7 +400,7 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
             ClassLayout& layout = classLayouts.at(chainType);
             int fieldIdx = layout.fieldIndex.at(parts.back());
             targetLT = llvmType(layout.fields[fieldIdx].first);
-            targetBerryType = layout.fields[fieldIdx].first;
+            targetberyType = layout.fields[fieldIdx].first;
 
             std::string objReg = llvm.__emitLoad(llvm.__pointerType(layout.llvmStructType), chainPtr, outputStream);
             memPtr = llvm.__emitFieldGEP(layout.llvmStructType, objReg, fieldIdx, outputStream);
@@ -408,7 +408,7 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
             Symbol& sym = symbolTable.get(ident->name);
             targetLT = llvmType(sym.type);
             memPtr = sym.llvmRegister;
-            targetBerryType = sym.type;
+            targetberyType = sym.type;
 
             if (sym.type == "string" && assign->op == "=") {
                 llvm.__declareExtern("declare i8* @bery_string_copy(i8*)", "bery_string_copy");
@@ -471,7 +471,7 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
                     std::string finalType;
                     memPtr = genFieldChainFromAddress(castReg, elemType, idxNode->memberChain, outputStream, finalType);
                     targetLT = llvmType(finalType);
-                    targetBerryType = finalType;
+                    targetberyType = finalType;
                 } else {
                     llvm.__declareExternFn("void", "bery_array_set", {"i8*", "i64", "i8*"});
                     std::string valReg = classLayouts.count(elemType)? genClassCopyValue(assign->value.get(), elemType, outputStream): genExpression(assign->value.get(), elemType, outputStream);
@@ -490,10 +490,10 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
                     std::string finalType;
                     memPtr = genFieldChainFromAddress(ptrReg, elemType, idxNode->memberChain, outputStream, finalType);
                     targetLT = llvmType(finalType);
-                    targetBerryType = finalType;
+                    targetberyType = finalType;
                 } else {
                     targetLT = lt;
-                    targetBerryType = elemType;
+                    targetberyType = elemType;
                     memPtr = ptrReg;
                 }
             }
@@ -509,23 +509,23 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
                 std::string finalType;
                 memPtr = genFieldChainFromAddress(ptrReg, baseType, idxNode->memberChain, outputStream, finalType);
                 targetLT = llvmType(finalType);
-                targetBerryType = finalType;
+                targetberyType = finalType;
             } else {
                 targetLT = llvmType(baseType);
-                targetBerryType = baseType;
+                targetberyType = baseType;
                 memPtr = ptrReg;
             }
         }
     } 
 
-    std::string valReg = classLayouts.count(targetBerryType) ?genClassCopyValue(assign->value.get(), targetBerryType, outputStream)
-        : genExpression(assign->value.get(), targetBerryType, outputStream);
+    std::string valReg = classLayouts.count(targetberyType) ?genClassCopyValue(assign->value.get(), targetberyType, outputStream)
+        : genExpression(assign->value.get(), targetberyType, outputStream);
 
     if (assign->op == "=") {
         llvm.__emitStore(targetLT, valReg, memPtr, outputStream);
         return valReg;
     }
-    else if (assign->op == "+=" && targetBerryType == "string") {
+    else if (assign->op == "+=" && targetberyType == "string") {
         llvm.__declareExternFn("i8*", "bery_string_copy", {"i8*"});
         std::string currVal = llvm.__emitLoad("i8*", memPtr, outputStream);
         std::string concatReg = llvm.__emitCall("i8*", "bery_string_concat", {{"i8*", currVal}, {"i8*", valReg}}, outputStream);
@@ -533,7 +533,7 @@ std::string CodeGen::genAssignmentExpr(ASTNode* node, std::ostream& outputStream
         return concatReg;
     }
 
-    bool isFloat = (targetBerryType == "float" || targetBerryType == "double");
+    bool isFloat = (targetberyType == "float" || targetberyType == "double");
     std::string curVal = llvm.__emitLoad(targetLT, memPtr, outputStream);
     std::string resReg;
 
@@ -801,15 +801,19 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
             }
         }
         if (classLayouts.count(objType)) {
-            std::string mangled = llvm.__mangleMethod(objType, method);
-            if (functions.count(mangled)) {
+            std::string owner = findMethodOwner(objType, method);
+            if (!owner.empty()) {
+                std::string mangled = llvm.__mangleMethod(owner, method);
                 CodeGenFunctionSignature& sig = functions[mangled];
-                std::string classPtrType = llvm.__pointerType(classLayouts.at(objType).llvmStructType);
-                std::string receiverReg = llvm.__emitLoad(classPtrType, objPtr, outputStream);
+
+                std::string objPtrType = llvm.__pointerType(classLayouts.at(objType).llvmStructType);
+                std::string receiverReg = llvm.__emitLoad(objPtrType, objPtr, outputStream);
+
+                std::string ownerPtrType = llvm.__pointerType(classLayouts.at(owner).llvmStructType);
+                std::string castReg = (owner == objType) ? receiverReg : llvm.__emitBitcast(objPtrType, receiverReg, ownerPtrType, outputStream);
 
                 std::vector<std::pair<std::string, std::string>> args;
-                args.push_back({classPtrType, receiverReg});
-            
+                args.push_back({ownerPtrType, castReg});
 
                 if (sig.returnType.empty() || sig.returnType == "void") {
                     llvm.__emitCall("void", mangled, args, outputStream);
@@ -821,15 +825,22 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
         return "0";
     }
     if (!currentClassName.empty() && classLayouts.count(currentClassName)) {
-        std::string mangled = llvm.__mangleMethod(currentClassName, call->callee);
-        if (functions.count(mangled)) {
+        std::string owner = findMethodOwner(currentClassName, call->callee);
+        if (!owner.empty()) {
+            std::string mangled = llvm.__mangleMethod(owner, call->callee);
             CodeGenFunctionSignature& sig = functions[mangled];
             Symbol& selfSym = symbolTable.get(currentSelfRef);
-            std::string classPtrType = llvm.__pointerType(classLayouts.at(currentClassName).llvmStructType);
-            std::string receiverReg = llvm.__emitLoad(classPtrType, selfSym.llvmRegister, outputStream);
+
+            std::string selfPtrType = llvm.__pointerType(classLayouts.at(currentClassName).llvmStructType);
+            std::string receiverReg = llvm.__emitLoad(selfPtrType, selfSym.llvmRegister, outputStream);
+
+            std::string ownerPtrType = llvm.__pointerType(classLayouts.at(owner).llvmStructType);
+            std::string castReg = (owner == currentClassName)
+                ? receiverReg
+                : llvm.__emitBitcast(selfPtrType, receiverReg, ownerPtrType, outputStream);
 
             std::vector<std::pair<std::string, std::string>> args;
-            args.push_back({classPtrType, receiverReg});
+            args.push_back({ownerPtrType, castReg});
 
             if (sig.returnType.empty() || sig.returnType == "void") {
                 llvm.__emitCall("void", mangled, args, outputStream);
@@ -918,12 +929,15 @@ std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& outputStream) {
     }
 
     if (layout.hasConstructor) {
-        std::string mangled = llvm.__mangleConstructor(newExpr->className);
+        std::string mangled = llvm.__mangleConstructor(layout.constructorOwner);
         CodeGenFunctionSignature& sig = functions[mangled];
+        std::string ownerPtrType = llvm.__pointerType(classLayouts.at(layout.constructorOwner).llvmStructType);
+        std::string ctorSelf = (layout.constructorOwner == newExpr->className) ? objReg : llvm.__emitBitcast(llvm.__pointerType(layout.llvmStructType), objReg, ownerPtrType, outputStream);
+
         std::vector<std::pair<std::string, std::string>> args;
-        args.push_back({llvm.__pointerType(layout.llvmStructType), objReg});
+        args.push_back({ownerPtrType, ctorSelf});
         for (size_t i = 0; i < newExpr->arguments.size(); ++i) {
-            std::string argReg = classLayouts.count(sig.parameterTypes[i + 1])? genClassCopyValue(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream)
+            std::string argReg = classLayouts.count(sig.parameterTypes[i + 1]) ? genClassCopyValue(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream)
                 : genExpression(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream);
             args.push_back({llvmType(sig.parameterTypes[i + 1]), argReg});
         }

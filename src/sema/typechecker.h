@@ -24,6 +24,7 @@
 #include "../parser/ast/classes.h"
 #include "../parser/ast/accessSpecifier.h"
 #include "../parser/ast/vardecl.h"
+#include "../parser/ast/functions.h"
 
 
 struct FunctionSignature {

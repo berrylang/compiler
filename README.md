@@ -1,6 +1,6 @@
 # The Bery Programming Language
 
-Bery is a compiled, statically typed, object-oriented programming language designed for performance and clarity. Built completely from scratch with a custom C++ frontend and an LLVM backend, Berry compiles directly to highly optimized native machine code.
+Bery is a compiled, statically typed, object-oriented programming language designed for performance and clarity. Built completely from scratch with a custom C++ frontend and an LLVM backend, Bery compiles directly to highly optimized native machine code.
 
 This project is a **Learning Project** by team of four undergraduate engineers.
 

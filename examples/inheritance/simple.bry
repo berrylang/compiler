@@ -1,0 +1,17 @@
+
+
+class A {
+    attributes[this]::
+        int a = 10;
+    
+}
+
+class B : A {
+    attributes[mine]::
+        int b = 20;
+}
+
+run {
+    B obj = new B();
+    println(obj.a);
+}
