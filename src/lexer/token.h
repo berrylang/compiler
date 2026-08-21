@@ -70,7 +70,7 @@ enum class TokenType {
     TOKEN_ENUM, TOKEN_RUN, 
     
     // @spical-statementds @keywords
-    TOKEN_IMPORT, TOKEN_EXTERN, TOKEN_CONST,
+    TOKEN_IMPORT, TOKEN_EXTERN, TOKEN_CONST, TOKEN_DELETE
 
 };
 

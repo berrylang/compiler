@@ -204,6 +204,33 @@ std::string TypeChecker::checkTernaryExpr(ASTNode* node) {
 
 std::string TypeChecker::checkUnaryExpr(ASTNode* node) {
     auto* unary = static_cast<UnaryExprNode*>(node);
+
+    if (unary->optr == "delete"){
+        auto fail = [&](const char* message){
+            std::cerr << "Bery:Error [Line " << unary->line << "]: " << message << "\n";
+            errors = true;
+            unary->resolvedType = "unknown";
+            return unary->resolvedType;
+        };
+        if (unary->operand->type != NodeType::INDEX_EXPR)
+            return fail("delete requires an array element target");
+
+        auto* index = static_cast<IndexExprNode*>(unary->operand.get());
+        if (!index->memberChain.empty() || index->indices.size() != 1)
+            return fail("delete expects exactly one array index");
+
+        std::string arrayType = resolveChainType(splitDots(index->name), index->line);
+        if (arrayType.size() <= 6 || arrayType.substr(0, 6) != "array<")
+            return fail("delete target must be a dynamic array");
+
+        std::string indexType = analyzeExpression(index->indices[0].get());
+        if (indexType != "int" && indexType != "bigint")
+            return fail("array delete index must be an integer");
+
+        unary->resolvedType = "void";
+        return unary->resolvedType;
+    }
+
     std::string optype = analyzeExpression(unary->operand.get());
     if(unary->optr=="++"||unary->optr=="--"||unary->optr=="post++"||unary->optr=="post--"){
         if(unary->operand->type != NodeType::IDENT && unary->operand->type != NodeType::INDEX_EXPR){

@@ -192,7 +192,7 @@ std::unique_ptr<ASTNode> Parser::parseUnary(){
 
     if(check(TokenType::TOKEN_BANG) ||check(TokenType::TOKEN_TILDE)||
         check(TokenType::TOKEN_INC)||check(TokenType::TOKEN_DEC)||
-        check(TokenType::TOKEN_MINUS)){
+        check(TokenType::TOKEN_MINUS) || check(TokenType::TOKEN_DELETE)){
             advance();
             std::string optr = previous().lexeme;
             auto operand = parsePostfix();
