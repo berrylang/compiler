@@ -343,8 +343,21 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
             FunctionSignature sig;
             sig.returnType = func->returnType;
             for (auto& p : func->parameters) sig.parameterTypes.push_back(p.first);
-            functions[cls->name + "." + func->name] = sig;
-
+            std::string methodName = cls->name +"."+func->name;
+            std::vector<FunctionSignature>& moverload = functions[methodName];
+            bool dupeoverload = false;
+             for(auto& existing : moverload){
+                if(existing.parameterTypes == sig.parameterTypes){
+                    dupeoverload = true;
+                    break; 
+                }
+            } 
+            if(dupeoverload && !func->isConstructor && !func->isDestructor){
+                std::cerr << "Bery:Error [Line " << func->line << "]: Function '" << func->name <<"' is already defined with same parameter types.\n";
+                errors = true;
+                    
+            }
+            moverload.push_back(sig);
             currentFunctionReturnType = func->returnType;
             symbolTable.pushScope();
             if (cls->attributes) {

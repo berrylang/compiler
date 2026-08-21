@@ -26,7 +26,16 @@ void SemanticAnalyzer::analyze() {
             FunctionSignature sig;
             sig.returnType = func->returnType;
             for (auto& p : func->parameters) sig.parameterTypes.push_back(p.first);
-            functions[func->name] = sig;
+            std::vector<FunctionSignature>& overload = functions[func->name];
+            for(auto& existing : overload){
+                if(existing.parameterTypes == sig.parameterTypes){
+                    std::cerr << "Bery:Error [Line " << func->line << "]: Function '" << func->name <<"' is already defined with same parameter types.\n";
+                    errors = true;
+                    break; 
+                }
+            } 
+            overload.push_back(sig);
+    
         } else if (node->type == NodeType::CLASS_DEF) {
             auto* cls = static_cast<ClassDefNode*>(node.get());
             classes[cls->name] = cls;
@@ -36,7 +45,7 @@ void SemanticAnalyzer::analyze() {
             FunctionSignature sig;
             sig.returnType = extern_node->returnType;
             for (auto& p : extern_node->parameters) sig.parameterTypes.push_back(p.first);
-            functions[extern_node->name] = sig;
+            functions[extern_node->name].push_back(sig);
         }
         else if (node->type == NodeType::ENUM_DECL) {
             analyzeEnumDecl(node.get());

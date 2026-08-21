@@ -36,6 +36,7 @@ struct ReturnStmtNode : public ASTNode {
 struct CallExprNode : public ASTNode {
     std::string callee; 
     std::vector<std::unique_ptr<ASTNode>> arguments;
+    std::vector<std::string> resolvedParamTypes;
 
     CallExprNode(const std::string& callee, std::vector<std::unique_ptr<ASTNode>> args, int ln)
         : callee(callee), arguments(std::move(args)) {
