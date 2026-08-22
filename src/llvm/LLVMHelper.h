@@ -63,6 +63,7 @@ public:
     void __emitReturn(const std::string& llvmType, const std::string& value, std::ostream& outputStream);
     void __emitDefaultReturn(const std::string& llvmType, std::ostream& outputStream);
     std::string __arguementRegName(const std::string& parameterName); 
+    std::string __mangleOverload(const std::string& base, const std::vector<std::string>& paramTypes);
 
     // @control flow
     void __emitLabel(const std::string& name, std::ostream& outputStream);

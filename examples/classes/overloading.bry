@@ -1,0 +1,21 @@
+
+
+class A {
+    attributes[this]::
+        int a = 10;
+
+    methods::
+        public func add(int a, int b) -> int {
+            return a + b;
+        }
+
+        public func add(float a, float b) -> float {
+            return a + b;
+        }
+}
+
+run {
+    A a = new A();
+    println(a.add(10, 20));
+    println(a.add(3.4, 54.32));
+}

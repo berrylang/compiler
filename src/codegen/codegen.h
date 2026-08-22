@@ -54,7 +54,7 @@ private:
    // @functions
    std::unordered_map<std::string, CodeGenFunctionSignature> functions;
    std::string currentFuncReturn;
-   void genFuncDef(ASTNode* node, std::ostream& outputStream);
+   void genFuncDef(ASTNode* node, const std::string& irName, std::ostream& outputStream);
    void genReturnStmt(ASTNode* node, std::ostream& outputStream);
    
    // @garbage collector
@@ -118,7 +118,7 @@ private:
       std::string destructorOwner = "";
    };
    std::unordered_map<std::string, ClassLayout> classLayouts;
-   std::string findMethodOwner(const std::string& className, const std::string& methodName);
+   std::string findMethodOwner(const std::string& className, const std::string& methodName, const std::vector<std::string>& paramTypes);
    void genClassDecl(ASTNode* node);
    std::string genNewExpr(ASTNode* node, std::ostream& outputStream);
    std::string genClassCopyValue(ASTNode* valueNode, const std::string& classType, std::ostream& outputStream);

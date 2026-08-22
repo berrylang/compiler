@@ -1,0 +1,14 @@
+
+
+func add(int a, int b) -> int {
+    return a + b;
+}
+
+func add(int a, int b, int c) -> int {
+    return a + b + c;
+}
+
+run {
+    println(add(10, 20));
+    println(add(10, 20, 30));
+}
