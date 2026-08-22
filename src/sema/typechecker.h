@@ -34,12 +34,12 @@ struct FunctionSignature {
 
 class TypeChecker {
 public:
-    TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, FunctionSignature>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef);    std::string analyzeExpression(ASTNode* node);
+    TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, std::vector<FunctionSignature>>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef);    std::string analyzeExpression(ASTNode* node);
     bool typeMatchesLiteral(const std::string& type, NodeType litType);
 
 private:
     SymbolTable& symbolTable;
-    std::unordered_map<std::string, FunctionSignature>& functions;
+    std::unordered_map<std::string, std::vector<FunctionSignature>>& functions;
     std::unordered_map<std::string, ClassDefNode*>& classes;
 
     // @todo : need chnages after Error Handler is added.
@@ -65,6 +65,10 @@ private:
     // @oop
     std::string& currentClass;
     ASTNode* findField(ClassDefNode* cls, const std::string& fieldName);
-    FunctionDefNode* findMethod(ClassDefNode* cls, const std::string& methodName);
+    std::vector <FunctionDefNode*> findMethod(ClassDefNode* cls, const std::string& methodName);
+    FunctionDefNode* resolveMethodOverload(const std::vector<FunctionDefNode*>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line);
+    const FunctionSignature* resolveFunctionOverload(const std::vector<FunctionSignature>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line);
+    bool isParameterTypePromotable(const std::string& from, const std::string& to);
+    bool isParameterTypeExactlyMatching(const std::vector<std::string>& a, const std::vector<std::string>& b);
     bool checkMemberAccess(AccessSpecifier access, const std::string& className, const std::string& memberName, const std::string& type, int line);
 };

@@ -801,9 +801,9 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
             }
         }
         if (classLayouts.count(objType)) {
-            std::string owner = findMethodOwner(objType, method);
+            std::string owner = findMethodOwner(objType, method, call->resolvedParamTypes);
             if (!owner.empty()) {
-                std::string mangled = llvm.__mangleMethod(owner, method);
+                std::string mangled = llvm.__mangleOverload(llvm.__mangleMethod(owner, method), call->resolvedParamTypes);
                 CodeGenFunctionSignature& sig = functions[mangled];
 
                 std::string objPtrType = llvm.__pointerType(classLayouts.at(objType).llvmStructType);
@@ -814,6 +814,11 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
 
                 std::vector<std::pair<std::string, std::string>> args;
                 args.push_back({ownerPtrType, castReg});
+                for (size_t i = 0; i < call->arguments.size(); ++i) {
+                    std::string paramType = sig.parameterTypes[i + 1];
+                    std::string argReg = classLayouts.count(paramType) ? genClassCopyValue(call->arguments[i].get(), paramType, outputStream) : genExpression(call->arguments[i].get(), paramType, outputStream);
+                    args.push_back({llvmType(paramType), argReg});
+                }
 
                 if (sig.returnType.empty() || sig.returnType == "void") {
                     llvm.__emitCall("void", mangled, args, outputStream);
@@ -825,9 +830,9 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
         return "0";
     }
     if (!currentClassName.empty() && classLayouts.count(currentClassName)) {
-        std::string owner = findMethodOwner(currentClassName, call->callee);
+        std::string owner = findMethodOwner(currentClassName, call->callee, call->resolvedParamTypes);
         if (!owner.empty()) {
-            std::string mangled = llvm.__mangleMethod(owner, call->callee);
+            std::string mangled = llvm.__mangleOverload(llvm.__mangleMethod(owner, call->callee), call->resolvedParamTypes);
             CodeGenFunctionSignature& sig = functions[mangled];
             Symbol& selfSym = symbolTable.get(currentSelfRef);
 
@@ -841,6 +846,11 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
 
             std::vector<std::pair<std::string, std::string>> args;
             args.push_back({ownerPtrType, castReg});
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                std::string paramType = sig.parameterTypes[i + 1];
+                std::string argReg = classLayouts.count(paramType) ? genClassCopyValue(call->arguments[i].get(), paramType, outputStream) : genExpression(call->arguments[i].get(), paramType, outputStream);
+                args.push_back({llvmType(paramType), argReg});
+            }
 
             if (sig.returnType.empty() || sig.returnType == "void") {
                 llvm.__emitCall("void", mangled, args, outputStream);
@@ -849,8 +859,12 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
             return llvm.__emitCall(llvmType(sig.returnType), mangled, args, outputStream);
         }
     }
-    if (functions.find(call->callee) == functions.end()) return "0";
-    CodeGenFunctionSignature& sig = functions[call->callee];
+    std::string calleeKey = call->callee;
+    if (functions.find(calleeKey) == functions.end()) {
+        calleeKey = llvm.__mangleOverload(call->callee, call->resolvedParamTypes);
+    }
+    if (functions.find(calleeKey) == functions.end()) return "0";
+    CodeGenFunctionSignature& sig = functions[calleeKey];
 
     std::vector<std::pair<std::string, std::string>> args;
     for (size_t i = 0; i < call->arguments.size(); ++i) {
@@ -859,10 +873,10 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
     }
 
     if (sig.returnType == "void") {
-        llvm.__emitCall("void", call->callee, args, outputStream);
+        llvm.__emitCall("void", calleeKey, args, outputStream);
         return "0";
     }
-    return llvm.__emitCall(llvmType(sig.returnType), call->callee, args, outputStream);
+    return llvm.__emitCall(llvmType(sig.returnType), calleeKey, args, outputStream);
 }
 
 std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& outputStream) {

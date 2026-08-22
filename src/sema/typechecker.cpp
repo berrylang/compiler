@@ -31,7 +31,7 @@ static std::vector<std::string> splitDots(const std::string& s) {
 }
 
 
-TypeChecker::TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, FunctionSignature>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef) 
+TypeChecker::TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, std::vector<FunctionSignature>>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef) 
     : symbolTable(symbolTable), functions(funcs), classes(classesMap), currentClass(currentClassRef), errors(errorsFlag) {}
 
 bool TypeChecker::typeMatchesLiteral(const std::string& type, NodeType litType) {
@@ -319,10 +319,18 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
         auto classIt = classes.find(objType);
         if (classIt != classes.end()) {
             ClassDefNode* cls = classIt->second;
-            FunctionDefNode* methodDef = findMethod(cls, method);
-            if (!methodDef) {
+            std::vector<FunctionDefNode*> candidateMethod = findMethod(cls, method);
+            if(candidateMethod.empty()){
                 std::cerr <<"Bery:Error [Line " << call->line <<"]: Class '" << objType <<"' has no method '" << method <<"'\n";
                 errors = true;
+                call->resolvedType = "unknown";
+                return call->resolvedType;
+            }
+
+            std::vector<std::string> argTypes;
+            for(auto& arg : call->arguments){argTypes.push_back(analyzeExpression(arg.get()));}
+            FunctionDefNode* methodDef = resolveMethodOverload(candidateMethod, argTypes, method, call->line);
+            if (!methodDef) {
                 call->resolvedType = "unknown";
                 return call->resolvedType;
             }
@@ -330,26 +338,10 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
                 call->resolvedType = "unknown";
                 return call->resolvedType;
             }
-            if (methodDef->parameters.size() != call->arguments.size()) {
-                std::cerr <<"Bery:Error [Line " << call->line <<"]: Method '" << method <<"' expects "<< methodDef->parameters.size() <<" arguments, got " << call->arguments.size() <<"\n";
-                errors = true;
-                call->resolvedType = "unknown";
-                return call->resolvedType;
-            }
-            for (size_t i = 0; i < call->arguments.size(); ++i) {
-                std::string argType   = analyzeExpression(call->arguments[i].get());
-                std::string paramType = methodDef->parameters[i].first;
-                if (argType != "unknown" && argType != paramType) {
-                    if (!(paramType == "float"  && argType == "int") &&
-                        !(paramType == "double" && argType == "float") &&
-                        !(paramType == "double" && argType == "int") &&
-                        !(paramType == "bigint" && argType == "int")) {
-                        std::cerr <<"Bery:Error [Line " << call->line <<"]: Type mismatch in argument " << i+1
-                                <<" of '" << method <<"'. Expected '" << paramType <<"', got '" << argType <<"'\n";
-                        errors = true;
-                    }
-                }
-            }
+            call->resolvedParamTypes.clear();
+            for(auto& p : methodDef->parameters){call->resolvedParamTypes.push_back(p.first);}
+            
+            
             call->resolvedType = methodDef->returnType.empty() ? "void" : methodDef->returnType;
             return call->resolvedType;
         }
@@ -363,62 +355,45 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
     if (!currentClass.empty()) {
         auto selfClassIt =classes.find(currentClass);
         if (selfClassIt != classes.end()) {
-            FunctionDefNode* f = findMethod(selfClassIt->second, call->callee);
-            if (f) {
-                if (f->parameters.size() != call->arguments.size()) {
-                    std::cerr <<"Bery:Error [Line " << call->line <<"]: Method '" << call->callee <<"' expects "<< f->parameters.size() <<" arguments, got " << call->arguments.size() <<"\n";
-                    errors = true;
+            std::vector<FunctionDefNode*> candidateFunction = findMethod(selfClassIt->second, call->callee);
+            if(!candidateFunction.empty()){
+                std::vector<std::string> argumentTypesName;
+                for(auto& argsss : call->arguments){
+                    argumentTypesName.push_back(analyzeExpression(argsss.get()));
+                }
+                FunctionDefNode* f = resolveMethodOverload(candidateFunction, argumentTypesName, call->callee, call->line);
+                if(!f){
                     call->resolvedType = "unknown";
                     return call->resolvedType;
                 }
-                for (size_t i = 0; i < call->arguments.size(); ++i) {
-                    std::string argType   = analyzeExpression(call->arguments[i].get());
-                    std::string paramType = f->parameters[i].first;
-                    if (argType != "unknown" && argType != paramType) {
-                        if (!(paramType == "float"&& argType =="int") && !(paramType == "double" && argType == "float") &&
-                            !(paramType == "double"&& argType==  "int") && !(paramType == "bigint" && argType == "int")) {
-                            std::cerr <<"Bery:Error [Line " << call->line <<"]: Type mismatch in argument " << i+1<<" of '" << call->callee <<"'. Expected '" << paramType <<"', got '" << argType <<"'\n";
-                            errors = true;
-                        }
-                    }
-                }
+                 call->resolvedParamTypes.clear();
+                for(auto& p : f->parameters){call->resolvedParamTypes.push_back(p.first);}
                 call->resolvedType = f->returnType.empty() ? "void" : f->returnType;
                 return call->resolvedType;
             }
+
+            
         }
+
     }
-    if (functions.find(call->callee) == functions.end()) {
+    auto functionIT = functions.find(call->callee);
+    if (functionIT == functions.end()) {
         std::cerr <<"Bery:Error [Line " << call->line <<"]: Undefined function '" << call->callee <<"'\n";
         errors = true;
         call->resolvedType = "unknown";
         return call->resolvedType;
     }
-
-    FunctionSignature& sig = functions[call->callee];
-    if (sig.parameterTypes.size() != call->arguments.size()) {
-        std::cerr <<"Bery:Error [Line " << call->line <<"]: Function '" << call->callee <<"' expects "
-                   << sig.parameterTypes.size() <<" arguments, got " << call->arguments.size() <<"\n";
-        errors = true;
+    std::vector<std::string> argTypes;
+    for(auto& hello : call->arguments){
+        argTypes.push_back(analyzeExpression(hello.get()));
+    }
+    const FunctionSignature* signature = resolveFunctionOverload(functionIT->second, argTypes, call->callee, call->line);
+    if(!signature){
         call->resolvedType = "unknown";
         return call->resolvedType;
     }
-
-    for (size_t i = 0; i < call->arguments.size(); ++i) {
-        std::string argType = analyzeExpression(call->arguments[i].get());
-        if (argType != "unknown" && argType != sig.parameterTypes[i]) {
-            if (!(sig.parameterTypes[i] == "float"  && argType == "int") &&
-                !(sig.parameterTypes[i] == "double" && argType == "float") &&
-                !(sig.parameterTypes[i] == "double" && argType == "int") &&
-                !(sig.parameterTypes[i] == "bigint" && argType == "int")) {
-                std::cerr <<"Bery:Error [Line " << call->line <<"]: Type mismatch in argument " << i+1
-                           <<" of '" << call->callee <<"'. Expected '" << sig.parameterTypes[i]
-                           <<"', got '" << argType <<"'\n";
-                errors = true;
-            }
-        }
-    }
-
-    call->resolvedType = sig.returnType;
+    call->resolvedParamTypes = signature->parameterTypes;
+    call->resolvedType = signature->returnType;
     return call->resolvedType;
 }
 
@@ -794,19 +769,127 @@ ASTNode* TypeChecker::findField(ClassDefNode* cls, const std::string& fieldName)
     return nullptr;
 }
 
-FunctionDefNode* TypeChecker::findMethod(ClassDefNode* cls, const std::string& methodName) {
+std::vector<FunctionDefNode*> TypeChecker::findMethod(ClassDefNode* cls, const std::string& methodName) {
+    std::vector<FunctionDefNode*> foundMethod;
     if (cls->methods) {
         for (auto& m : cls->methods->methods) {
             auto* f = static_cast<FunctionDefNode*>(m.get());
             if (f->isConstructor || f->isDestructor) continue;
-            if (f->name == methodName) return f;
+            if (f->name == methodName) foundMethod.push_back(f);
         }
+    }
+    if(!foundMethod.empty()){
+        return foundMethod;
     }
     if (!cls->parentName.empty()) {
         auto it = classes.find(cls->parentName);
         if (it != classes.end()) return findMethod(it->second, methodName);
     }
+    return foundMethod;
+}
+
+FunctionDefNode* TypeChecker::resolveMethodOverload(const std::vector<FunctionDefNode*>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line){
+    for(auto* a : candidate){
+        std::vector<std::string> parameterTypeList;
+        for(auto& p : a->parameters){
+            parameterTypeList.push_back(p.first);
+        }
+        if(isParameterTypeExactlyMatching(parameterTypeList, argTypes)){
+            return a;
+        }
+    }
+    FunctionDefNode* c = nullptr;
+    int matchCount = 0;
+    for(auto* f : candidate){
+        if(f->parameters.size()!=argTypes.size()){continue;}
+        bool thirtyfour = true;
+        for(size_t i = 0; i<argTypes.size();i++){
+            if(argTypes[i] == "unknown"){continue;}
+            if(!isParameterTypePromotable(argTypes[i],f->parameters[i].first)){thirtyfour = false; break;}
+        }
+        if(thirtyfour){
+            matchCount++;
+            c = f;
+        }
+    }
+    if(matchCount==1){return c;}
+    if(matchCount>1){
+         std::cerr <<"Bery:Error [Line " << line <<"]: Ambiguous call to method '"<< label <<"' with "<< argTypes.size() <<" arguments  '\n";
+         errors = true;
+         return nullptr;
+    }
+    bool isAnyMethodMatchingToThisWhatToThisToThisCallCall = false;
+    for(auto* f : candidate){
+        if(f->parameters.size() == argTypes.size()){
+            isAnyMethodMatchingToThisWhatToThisToThisCallCall = true;
+        }
+    }
+    if(!isAnyMethodMatchingToThisWhatToThisToThisCallCall){
+        std::cerr << "Bery:Error [Line "<< line << "]: No overloaded method '"<< label <<"' accepts the "<< argTypes.size() <<" arguments. \n";
+    }
+    else{std::cerr << "Bery:Error [Line "<< line << "]: No matching overload of method '"<< label <<"' for this given arugment types\n";}
+    errors = true;
     return nullptr;
+}
+const FunctionSignature* TypeChecker::resolveFunctionOverload(const std::vector<FunctionSignature>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line){
+    for(auto& a : candidate){
+        if(isParameterTypeExactlyMatching(a.parameterTypes, argTypes)){
+            return &a;
+        }
+    }
+    const FunctionSignature* c = nullptr;
+    int matchCount = 0;
+    for(auto& f : candidate){
+        if(f.parameterTypes.size()!=argTypes.size()){continue;}
+        bool thirtyfour = true;
+        for(size_t i = 0; i<argTypes.size();i++){
+            if(argTypes[i] == "unknown"){continue;}
+            if(!isParameterTypePromotable(argTypes[i],f.parameterTypes[i])){thirtyfour = false; break;}
+        }
+        if(thirtyfour){
+            matchCount++;
+            c = &f;
+        }
+    }
+    if(matchCount==1){return c;}
+    if(matchCount>1){
+         std::cerr <<"Bery:Error [Line " << line <<"]: Ambiguous call to function '"<< label <<"' with "<< argTypes.size() <<" arguments  '\n";
+         errors = true;
+         return nullptr;
+    }
+    bool isAnyMethodMatchingToThisWhatToThisToThisCallCall = false;
+    for(auto& f : candidate){
+        if(f.parameterTypes.size() == argTypes.size()){
+            isAnyMethodMatchingToThisWhatToThisToThisCallCall = true;
+        }
+    }
+    if(!isAnyMethodMatchingToThisWhatToThisToThisCallCall){
+        std::cerr << "Bery:Error [Line "<< line << "]: No overloaded function '"<< label <<"' accepts the "<< argTypes.size() <<" arguments. \n";
+    }
+    else{std::cerr << "Bery:Error [Line "<< line << "]: No matching overload of function '"<< label <<"' for this given arugment types\n";}
+    errors = true;
+    return nullptr;
+}
+bool TypeChecker::isParameterTypePromotable(const std::string& from, const std::string& to){
+    if(from==to){return true;}
+    if(to=="float" && from=="int"){return true;}
+    if(to=="double" && from=="int"){return true;}
+    if(to=="double" && from=="float"){return true;}
+    if(to=="bigint" && from=="int"){return true;}
+    return false;
+    
+
+}
+bool TypeChecker::isParameterTypeExactlyMatching(const std::vector<std::string>& a, const std::vector<std::string>& b){
+    if(a.size()!=b.size()){
+        return false;
+    }
+    for(size_t i = 0;i < a.size(); i++){
+        if(a[i]!=b[i]){
+            return false;
+        }
+    }
+    return true;
 }
 
 bool TypeChecker::checkMemberAccess(AccessSpecifier access, const std::string& className, const std::string& memberName, const std::string& type, int line) {

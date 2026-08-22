@@ -77,8 +77,11 @@ void CodeGen::genClassDecl(ASTNode* node) {
     if (cls->methods) {
         for (auto& m : cls->methods->methods) {
             auto* func = static_cast<FunctionDefNode*>(m.get());
-            std::string mangledName = func->isConstructor ? llvm.__mangleConstructor(cls->name)
-                         : func->isDestructor ? llvm.__mangleDestructor(cls->name) : llvm.__mangleMethod(cls->name, func->name);
+            std::vector<std::string> beryParamTypes;
+            for (auto& p : func->parameters) beryParamTypes.push_back(p.first);
+            std::string mangledName = func->isConstructor ? 
+                llvm.__mangleConstructor(cls->name) : func->isDestructor ? 
+                llvm.__mangleDestructor(cls->name) : llvm.__mangleOverload(llvm.__mangleMethod(cls->name, func->name), beryParamTypes);
 
             CodeGenFunctionSignature signature;
             signature.returnType = func->returnType;
@@ -269,7 +272,7 @@ void CodeGen::genArrayDecl(ASTNode* node, std::ostream& outputStream) {
     }
 }
 
-void CodeGen::genFuncDef(ASTNode* node, std::ostream& outputStream) {
+void CodeGen::genFuncDef(ASTNode* node, const std::string& irName, std::ostream& outputStream) {
     auto* func = static_cast<FunctionDefNode*>(node);
     std::string retLT = (func->returnType == "void") ? "void" : llvmType(func->returnType);
     currentFuncReturn = func->returnType;
@@ -278,7 +281,7 @@ void CodeGen::genFuncDef(ASTNode* node, std::ostream& outputStream) {
     for (auto& p : func->parameters) {
         params.push_back({llvmType(p.first), llvm.__arguementRegName(p.second)});
     }
-    llvm.__emitFunctionHeader(retLT, func->name, params, outputStream);
+    llvm.__emitFunctionHeader(retLT, irName, params, outputStream);
 
     symbolTable.pushScope();
     pushGCScope();

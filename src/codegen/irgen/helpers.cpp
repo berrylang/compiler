@@ -84,10 +84,10 @@ void CodeGen::genStatement(ASTNode* statement, std::ostream& outputStream) {
     else if (statement->type == NodeType::FOR_IN_STMT) genForInStmt(statement, outputStream);
 }
 
-std::string CodeGen::findMethodOwner(const std::string& className, const std::string& methodName) {
+std::string CodeGen::findMethodOwner(const std::string& className, const std::string& methodName, const std::vector<std::string>& paramTypes) {
     std::string cur = className;
     while (!cur.empty() && classLayouts.count(cur)) {
-        std::string mangled = llvm.__mangleMethod(cur, methodName);
+        std::string mangled = llvm.__mangleOverload(llvm.__mangleMethod(cur, methodName), paramTypes);
         if (functions.count(mangled)) return cur;
         cur = classLayouts.at(cur).parentName;
     }

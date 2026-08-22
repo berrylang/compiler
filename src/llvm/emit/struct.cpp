@@ -66,3 +66,20 @@ std::string LLVMHelper::__mangleConstructor(const std::string& className) {
 std::string LLVMHelper::__mangleDestructor(const std::string& className) {
     return className + "$destructor";
 }
+
+std::string LLVMHelper::__mangleOverload(const std::string& base, const std::vector<std::string>& paramTypes) {
+    std::string result = base;
+    for (auto& beryType : paramTypes) {
+        std::string lt = __llvmType(beryType);
+        if (lt.empty()) {
+            result += "." + beryType;
+        } else if (beryType == "string") {
+            result += ".str";
+        } else if (beryType.size() > 6 && beryType.substr(0, 6) == "array<") {
+            result += ".arr";
+        } else {
+            result += "." + lt;
+        }
+    }
+    return result;
+}

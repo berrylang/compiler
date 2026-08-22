@@ -68,7 +68,7 @@ private:
    void analyzeContinueStmt(ASTNode* node);
 
    // @functions
-   std::unordered_map<std::string, FunctionSignature> functions;
+   std::unordered_map<std::string, std::vector<FunctionSignature>> functions;
    std::string currentFunctionReturnType = "";
    void analyzeFuncDef(ASTNode* node);
    void analyzeReturnStmt(ASTNode* node);

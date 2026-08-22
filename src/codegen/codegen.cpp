@@ -63,9 +63,9 @@ void CodeGen::generate(const std::string& outputPath) {
             CodeGenFunctionSignature signature;
             signature.returnType = func->returnType;
             for (auto& p : func->parameters) signature.parameterTypes.push_back(p.first);
-            functions[func->name] = signature;
-            
-            genFuncDef(node.get(), globalsOutputStream);
+            std::string mangledName = llvm.__mangleOverload(func->name, signature.parameterTypes);
+            functions[mangledName] = signature;
+            genFuncDef(node.get(), mangledName, globalsOutputStream);
         }
         else if (node->type == NodeType::EXTERN_DECL) {
             auto* extern_node = static_cast<ExternDeclNode*>(node.get());
