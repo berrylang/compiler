@@ -71,7 +71,7 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"public", TokenType::TOKEN_PUBLIC},
     {"private", TokenType::TOKEN_PRIVATE},
     {"protected", TokenType::TOKEN_PROTECTED},
-    
+    {"super", TokenType::TOKEN_SUPER},
 };
 
 Lexer::Lexer(const std::string& source) : source(source), current(0), line(1), errors(false) {}

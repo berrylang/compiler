@@ -6,7 +6,7 @@ This readme is intended to give you sufficient knowledge about Bery's Lexical an
 #### Maximal Munch rule
 Lexer follows maximal munch trick to emit the correct tokens in a single pass. 
 
-e.g. if lexer finds '+' then it look ahead for next symbol, if it is '+' it emits `TOKEN_INC`, if it is '=' it emits `TOKEN_EQUAL`, if it is neither then it emits `TOKEN_PLUS`.
+e.g. if lexer finds '+' then it look ahead for next symbol, if it is '+' it emits `TOKEN_INC`, if it is '=' it emits `TOKEN_PLUS_EQUAL`, if it is neither then it emits `TOKEN_PLUS`.
 
 ---
 
@@ -18,13 +18,13 @@ Lexer intentionally drops every whitespaces (' ', \t, \n, \r), and every comment
 
 #### Tokenization rule
 
-|category | Rule |
+|Category | Rule |
 |---|---|
-|whitepsaces | ignored, except for line couting|
-|Comments| ignored|
+|Whitepsaces | Ignored, except for line counting|
+|Comments| Ignored|
 |Keywords|Recognised after identifier scanning|
-|Identifiers|Leter or _ followed by leeters, digit or _|
-|Operators| maximal munch|
+|Identifiers|Letter or _ followed by letters, digits or _|
+|Operators| Maximal munch|
 
 
 #### Keywords 
@@ -35,10 +35,11 @@ Lexer intentionally drops every whitespaces (' ', \t, \n, \r), and every comment
 |else|switch|case|default|break|continue|
 |pass|while|do|for|in|func|
 |return|enum|import|extern|class|attributes|
-|methods|new|public|private|protected||
+|methods|new|public|private|protected|ref|
+|super||||||
 
 
-#### COmplexity analysis
+#### Complexity analysis
 
 - Scanning : Single pass
 - Token Recognization : Maximal Munch
