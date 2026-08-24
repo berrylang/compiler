@@ -1,0 +1,37 @@
+
+
+class A {
+    attributes[this]::
+        int a = 10;
+
+    methods::
+        A(int a) {
+            this.a = a;
+        }
+
+        public func my_method(int a) -> int {
+            return a * 2;
+        }
+}
+
+class B : A {
+    attributes[me]::
+        int b = 10;
+
+    methods::
+        B(int a, int b)  {
+            super(a);
+            me.b = b;
+        }
+
+        func my(int b) -> int {
+            return super.my_method(b);
+        }
+}
+
+
+run {
+    B obj = new B(30, 20);
+    println(obj.my(30));
+    println(obj.a);
+}

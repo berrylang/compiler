@@ -16,7 +16,7 @@
 #include <iostream>
 
 SemanticAnalyzer::SemanticAnalyzer(ASTNode* root)
-   : root(root), errors(false), typeChecker(symbolTable, functions, errors, classes, currentClassContext) {}
+   : root(root), errors(false), typeChecker(symbolTable, functions, errors, classes, currentClassContext, currentFunctionIsConstructor) {}
 
 void SemanticAnalyzer::analyze() {
     auto* program = static_cast<ProgramNode*>(root);

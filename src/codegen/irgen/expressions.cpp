@@ -698,6 +698,71 @@ std::string CodeGen::genCallExpr(ASTNode* node, std::ostream& outputStream) {
     if (breFns.count(call->callee))
         return genBREPrintCall(node, outputStream);
 
+    if (call->callee == "super" || call->callee.rfind("super.", 0) == 0) {
+        std::string parentName = classLayouts.at(currentClassName).parentName;
+        Symbol& selfSym = symbolTable.get(currentSelfRef);
+        std::string selfPtrType = llvm.__pointerType(classLayouts.at(currentClassName).llvmStructType);
+        std::string selfPtr = llvm.__emitLoad(selfPtrType, selfSym.llvmRegister, outputStream);
+
+        if (call->callee == "super") {
+            if (call->resolvedParamTypes.empty() && call->arguments.empty()) {
+                bool anyAncestorCtor = false;
+                std::string cur = parentName;
+                while (!cur.empty() && classLayouts.count(cur)) {
+                    if (classLayouts.at(cur).hasConstructor) { anyAncestorCtor = true; break; }
+                    cur = classLayouts.at(cur).parentName;
+                }
+                if (!anyAncestorCtor) return "0";
+            }
+            std::string ctorOwner = parentName;
+            std::string mangled;
+            while (!ctorOwner.empty() && classLayouts.count(ctorOwner)) {
+                std::string candidate = llvm.__mangleOverload(llvm.__mangleConstructor(ctorOwner), call->resolvedParamTypes);
+                if (functions.count(candidate)) { mangled = candidate; break; }
+                ctorOwner = classLayouts.at(ctorOwner).parentName;
+            }
+            if (mangled.empty()) return "0";
+            CodeGenFunctionSignature& sig = functions[mangled];
+            std::string ownerPtrType = llvm.__pointerType(classLayouts.at(ctorOwner).llvmStructType);
+            std::string castReg = (ctorOwner == currentClassName) ? selfPtr
+                : llvm.__emitBitcast(selfPtrType, selfPtr, ownerPtrType, outputStream);
+
+            std::vector<std::pair<std::string, std::string>> args;
+            args.push_back({ownerPtrType, castReg});
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                std::string paramType = sig.parameterTypes[i + 1];
+                std::string argReg = classLayouts.count(paramType) ? genClassCopyValue(call->arguments[i].get(), paramType, outputStream)
+                    : genExpression(call->arguments[i].get(), paramType, outputStream);
+                args.push_back({llvmType(paramType), argReg});
+            }
+            llvm.__emitCall("void", mangled, args, outputStream);
+            return "0";
+        }
+
+        std::string method = call->callee.substr(6);
+        std::string owner = findMethodOwner(parentName, method, call->resolvedParamTypes);
+        if (owner.empty()) return "0";
+        std::string mangled = llvm.__mangleOverload(llvm.__mangleMethod(owner, method), call->resolvedParamTypes);
+        CodeGenFunctionSignature& sig = functions[mangled];
+        std::string ownerPtrType = llvm.__pointerType(classLayouts.at(owner).llvmStructType);
+        std::string castReg = (owner == currentClassName) ? selfPtr
+            : llvm.__emitBitcast(selfPtrType, selfPtr, ownerPtrType, outputStream);
+
+        std::vector<std::pair<std::string, std::string>> args;
+        args.push_back({ownerPtrType, castReg});
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            std::string paramType = sig.parameterTypes[i + 1];
+            std::string argReg = classLayouts.count(paramType) ? genClassCopyValue(call->arguments[i].get(), paramType, outputStream)
+                : genExpression(call->arguments[i].get(), paramType, outputStream);
+            args.push_back({llvmType(paramType), argReg});
+        }
+        if (sig.returnType.empty() || sig.returnType == "void") {
+            llvm.__emitCall("void", mangled, args, outputStream);
+            return "0";
+        }
+        return llvm.__emitCall(llvmType(sig.returnType), mangled, args, outputStream);
+    }
+
     size_t dot = call->callee.find('.');
     if (dot != std::string::npos) {
         std::vector<std::string> parts = splitDots(call->callee);
@@ -943,19 +1008,29 @@ std::string CodeGen::genNewExpr(ASTNode* node, std::ostream& outputStream) {
     }
 
     if (layout.hasConstructor) {
-        std::string mangled = llvm.__mangleConstructor(layout.constructorOwner);
-        CodeGenFunctionSignature& sig = functions[mangled];
-        std::string ownerPtrType = llvm.__pointerType(classLayouts.at(layout.constructorOwner).llvmStructType);
-        std::string ctorSelf = (layout.constructorOwner == newExpr->className) ? objReg : llvm.__emitBitcast(llvm.__pointerType(layout.llvmStructType), objReg, ownerPtrType, outputStream);
-
-        std::vector<std::pair<std::string, std::string>> args;
-        args.push_back({ownerPtrType, ctorSelf});
-        for (size_t i = 0; i < newExpr->arguments.size(); ++i) {
-            std::string argReg = classLayouts.count(sig.parameterTypes[i + 1]) ? genClassCopyValue(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream)
-                : genExpression(newExpr->arguments[i].get(), sig.parameterTypes[i + 1], outputStream);
-            args.push_back({llvmType(sig.parameterTypes[i + 1]), argReg});
+        std::string ctorOwner = layout.constructorOwner;
+        std::string mangled;
+        while (!ctorOwner.empty() && classLayouts.count(ctorOwner)) {
+            std::string candidate = llvm.__mangleOverload(llvm.__mangleConstructor(ctorOwner), newExpr->resolvedParamTypes);
+            if (functions.count(candidate)) { mangled = candidate; break; }
+            ctorOwner = classLayouts.at(ctorOwner).parentName;
         }
-        llvm.__emitCall("void", mangled, args, outputStream);
+        if (!mangled.empty()) {
+            CodeGenFunctionSignature& sig = functions[mangled];
+            std::string ownerPtrType = llvm.__pointerType(classLayouts.at(ctorOwner).llvmStructType);
+            std::string ctorSelf = (ctorOwner == newExpr->className) ? objReg
+                : llvm.__emitBitcast(llvm.__pointerType(layout.llvmStructType), objReg, ownerPtrType, outputStream);
+
+            std::vector<std::pair<std::string, std::string>> args;
+            args.push_back({ownerPtrType, ctorSelf});
+            for (size_t i = 0; i < newExpr->arguments.size(); ++i) {
+                std::string paramType = sig.parameterTypes[i + 1];
+                std::string argReg = classLayouts.count(paramType) ? genClassCopyValue(newExpr->arguments[i].get(), paramType, outputStream)
+                    : genExpression(newExpr->arguments[i].get(), paramType, outputStream);
+                args.push_back({llvmType(paramType), argReg});
+            }
+            llvm.__emitCall("void", mangled, args, outputStream);
+        }
     }
 
     return objReg;
@@ -1000,8 +1075,10 @@ std::string CodeGen::cloneClassInstance(const std::string& classType, const std:
 
 
 std::string CodeGen::genFieldChainAddressing(const std::vector<std::string>& parts, std::ostream& outputStream, std::string& outputType) {
-    Symbol& base = symbolTable.get(parts[0]);
-    std::vector<std::string> rest(parts.begin() + 1, parts.end());
+    std::vector<std::string> resolvedParts = parts;
+    if (resolvedParts[0] == "super") resolvedParts[0] = currentSelfRef;
+    Symbol& base = symbolTable.get(resolvedParts[0]);
+    std::vector<std::string> rest(resolvedParts.begin() + 1, resolvedParts.end());
     return genFieldChainFromAddress(base.llvmRegister, base.type, rest, outputStream, outputType);
 }
 
