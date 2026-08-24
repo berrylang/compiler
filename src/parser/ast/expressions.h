@@ -121,6 +121,7 @@ struct IndexExprNode : public ASTNode {
 struct NewExprNode : public ASTNode {
     std::string className;
     std::vector<std::unique_ptr<ASTNode>> arguments;
+    std::vector<std::string> resolvedParamTypes;
 
     NewExprNode(std::string cls, std::vector<std::unique_ptr<ASTNode>> args, int ln) : className(cls), arguments(std::move(args)){
         type = NodeType::NEW_EXPR;

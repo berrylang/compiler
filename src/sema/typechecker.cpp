@@ -31,8 +31,8 @@ static std::vector<std::string> splitDots(const std::string& s) {
 }
 
 
-TypeChecker::TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, std::vector<FunctionSignature>>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef) 
-    : symbolTable(symbolTable), functions(funcs), classes(classesMap), currentClass(currentClassRef), errors(errorsFlag) {}
+TypeChecker::TypeChecker(SymbolTable& symbolTable, std::unordered_map<std::string, std::vector<FunctionSignature>>& funcs, bool& errorsFlag, std::unordered_map<std::string, ClassDefNode*>& classesMap, std::string& currentClassRef, bool& inConstructorRef) 
+    : symbolTable(symbolTable), functions(funcs), classes(classesMap), currentClass(currentClassRef), errors(errorsFlag), inConstructor(inConstructorRef) {}
 
 bool TypeChecker::typeMatchesLiteral(const std::string& type, NodeType litType) {
    if (type == "int"    && litType == NodeType::INT_LIT)     return true;
@@ -280,7 +280,9 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
         call->resolvedType = (it != inputTypes.end()) ? it->second : "void";
         return call->resolvedType;
     }
-    
+    if (call->callee == "super" || call->callee.rfind("super.", 0) == 0) {
+        return checkSuperCall(node);
+    }
     size_t dot = call->callee.find('.');
     if (dot != std::string::npos) {
         std::vector<std::string> parts = splitDots(call->callee);
@@ -683,23 +685,16 @@ std::string TypeChecker::checkNewExpr(ASTNode* node) {
     auto* newExpr = static_cast<NewExprNode*>(node);
     auto classIt = classes.find(newExpr->className);
     if (classIt == classes.end()) {
-        std::cerr <<"Bery:Error [Line " << newExpr->line <<"]: Unknown class '" << newExpr->className <<"'\n";
+        std::cerr << "Bery:Error [Line " << newExpr->line << "]: Unknown class '" << newExpr->className << "'\n";
         errors = true;
         newExpr->resolvedType = "unknown";
         return newExpr->resolvedType;
     }
 
-    FunctionDefNode* ctor = nullptr;
-    if (classIt->second->methods) {
-        for (auto& m : classIt->second->methods->methods) {
-            auto* f = static_cast<FunctionDefNode*>(m.get());
-            if (f->isConstructor) { ctor = f; break; }
-        }
-    }
-
-    if (!ctor) {
+    std::vector<FunctionDefNode*> candidates = findConstructors(classIt->second);
+    if (candidates.empty()) {
         if (!newExpr->arguments.empty()) {
-            std::cerr <<"Bery:Error [Line " << newExpr->line <<"]: Class '" << newExpr->className <<"' has no constructor accepting " << newExpr->arguments.size() <<" argument(s)\n";
+            std::cerr << "Bery:Error [Line " << newExpr->line << "]: Class '" << newExpr->className << "' has no constructor accepting " << newExpr->arguments.size() << " argument(s)\n";
             errors = true;
         }
         for (auto& arg : newExpr->arguments) analyzeExpression(arg.get());
@@ -707,26 +702,96 @@ std::string TypeChecker::checkNewExpr(ASTNode* node) {
         return newExpr->resolvedType;
     }
 
-    if (ctor->parameters.size() != newExpr->arguments.size()) {
-        std::cerr <<"Bery:Error [Line " << newExpr->line <<"]: Constructor for '" << newExpr->className <<"' expects "<< ctor->parameters.size() <<" arguments, got " << newExpr->arguments.size() <<"\n";
-        errors = true;
+    std::vector<std::string> argTypes;
+    for (auto& arg : newExpr->arguments) argTypes.push_back(analyzeExpression(arg.get()));
+    FunctionDefNode* ctor = resolveMethodOverload(candidates, argTypes, newExpr->className, newExpr->line);
+    if (!ctor) {
         newExpr->resolvedType = "unknown";
         return newExpr->resolvedType;
     }
-    for (size_t i = 0; i < newExpr->arguments.size(); ++i) {
-        std::string argType   = analyzeExpression(newExpr->arguments[i].get());
-        std::string paramType = ctor->parameters[i].first;
-        if (argType != "unknown" && argType != paramType) {
-            if (!(paramType == "float"  && argType == "int") && !(paramType == "double" && argType == "float") &&
-                !(paramType == "double" && argType == "int") && !(paramType == "bigint" && argType == "int")) {
-                std::cerr <<"Bery:Error [Line " << newExpr->line <<"]: Type mismatch in constructor argument " << i+1<<" of '" << newExpr->className <<"'. Expected '" << paramType <<"', got '" << argType <<"'\n";
-                errors = true;
-            }
-        }
-    }
-
+    newExpr->resolvedParamTypes.clear();
+    for (auto& p : ctor->parameters) newExpr->resolvedParamTypes.push_back(p.first);
     newExpr->resolvedType = newExpr->className;
     return newExpr->resolvedType;
+}
+
+std::vector<FunctionDefNode*> TypeChecker::findConstructors(ClassDefNode* cls) {
+    std::vector<FunctionDefNode*> found;
+    if (cls->methods) {
+        for (auto& m : cls->methods->methods) {
+            auto* f = static_cast<FunctionDefNode*>(m.get());
+            if (f->isConstructor) found.push_back(f);
+        }
+    }
+    if (!found.empty()) return found;
+    if (!cls->parentName.empty()) {
+        auto it = classes.find(cls->parentName);
+        if (it != classes.end()) return findConstructors(it->second);
+    }
+    return found;
+}
+
+std::string TypeChecker::checkSuperCall(ASTNode* node) {
+    auto* call = static_cast<CallExprNode*>(node);
+
+    if (currentClass.empty() || !classes.count(currentClass) || classes.at(currentClass)->parentName.empty()) {
+        std::cerr << "Bery:Error [Line " << call->line << "]: 'super' used outside of a subclass method\n";
+        errors = true;
+        call->resolvedType = "unknown";
+        return call->resolvedType;
+    }
+    std::string parentName = classes.at(currentClass)->parentName;
+
+    if (call->callee == "super") {
+        if (!inConstructor) {
+            std::cerr << "Bery:Error [Line " << call->line << "]: 'super(...)' can only be called inside a constructor\n";
+            errors = true;
+            call->resolvedType = "unknown";
+            return call->resolvedType;
+        }
+        std::vector<FunctionDefNode*> candidates = findConstructors(classes.at(parentName));
+        if (candidates.empty()) {
+            if (!call->arguments.empty()) {
+                std::cerr << "Bery:Error [Line " << call->line << "]: No constructor found in parent chain of '" << currentClass << "' for 'super(...)'\n";
+                errors = true;
+            }
+            for (auto& arg : call->arguments) analyzeExpression(arg.get());
+            call->resolvedParamTypes.clear();
+            call->resolvedType = "void";
+            return call->resolvedType;
+        }
+        std::vector<std::string> argTypes;
+        for (auto& arg : call->arguments) argTypes.push_back(analyzeExpression(arg.get()));
+        FunctionDefNode* ctor = resolveMethodOverload(candidates, argTypes, "super(...)", call->line);
+        if (!ctor) { call->resolvedType = "unknown"; return call->resolvedType; }
+        call->resolvedParamTypes.clear();
+        for (auto& p : ctor->parameters) call->resolvedParamTypes.push_back(p.first);
+        call->resolvedType = "void";
+        return call->resolvedType;
+    }
+
+    std::string method = call->callee.substr(6);
+    std::vector<FunctionDefNode*> candidates = findMethod(classes.at(parentName), method);
+    if (candidates.empty()) {
+        std::cerr << "Bery:Error [Line " << call->line << "]: No method '" << method << "' found in parent chain of '" << currentClass << "'\n";
+        errors = true;
+        call->resolvedType = "unknown";
+        return call->resolvedType;
+    }
+    std::vector<std::string> argTypes;
+    for (auto& arg : call->arguments) argTypes.push_back(analyzeExpression(arg.get()));
+    FunctionDefNode* methodDef = resolveMethodOverload(candidates, argTypes, method, call->line);
+    if (!methodDef) { call->resolvedType = "unknown"; return call->resolvedType; }
+    if (methodDef->access == AccessSpecifier::PRIVATE) {
+        std::cerr << "Bery:Error [Line " << call->line << "]: Cannot access private method '" << method << "' via 'super'\n";
+        errors = true;
+        call->resolvedType = "unknown";
+        return call->resolvedType;
+    }
+    call->resolvedParamTypes.clear();
+    for (auto& p : methodDef->parameters) call->resolvedParamTypes.push_back(p.first);
+    call->resolvedType = methodDef->returnType.empty() ? "void" : methodDef->returnType;
+    return call->resolvedType;
 }
 
 std::string TypeChecker::checkRefExpr(ASTNode* node) {
@@ -910,12 +975,22 @@ bool TypeChecker::checkMemberAccess(AccessSpecifier access, const std::string& c
 }
 
 std::string TypeChecker::resolveChainType(const std::vector<std::string>& parts, int line) {
-    if (!symbolTable.exists(parts[0])) {
-        std::cerr <<"Bery:Error [Line " << line <<"]: Undefined variable '" << parts[0] <<"'\n";
-        errors = true;
-        return "unknown";
+    std::string currentType;
+    if (parts[0] == "super") {
+        if (currentClass.empty() || !classes.count(currentClass) || classes.at(currentClass)->parentName.empty()) {
+            std::cerr << "Bery:Error [Line " << line << "]: 'super' used outside of a subclass method\n";
+            errors = true;
+            return "unknown";
+        }
+        currentType = classes.at(currentClass)->parentName;
+    } else {
+        if (!symbolTable.exists(parts[0])) {
+            std::cerr << "Bery:Error [Line " << line << "]: Undefined variable '" << parts[0] << "'\n";
+            errors = true;
+            return "unknown";
+        }
+        currentType = symbolTable.get(parts[0]).type;
     }
-    std::string currentType = symbolTable.get(parts[0]).type;
     std::vector<std::string> rest(parts.begin() + 1, parts.end());
     return resolveFieldChainFrom(currentType, rest, line);
 }

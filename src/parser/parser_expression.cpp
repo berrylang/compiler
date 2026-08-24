@@ -231,7 +231,7 @@ std::unique_ptr<ASTNode> Parser::parsePrimary(){
         consume(TokenType::TOKEN_RPARAN, "Expected ')' after constructor arguments");
         return std::make_unique<NewExprNode>(className.lexeme, std::move(arguments), t.line);
     }
-    if (t.type == TokenType::TOKEN_IDENT) {
+    if (t.type == TokenType::TOKEN_IDENT || t.type == TokenType::TOKEN_SUPER) {
         advance();
         std::string fullName = t.lexeme;
         while (check(TokenType::TOKEN_DOT)) {

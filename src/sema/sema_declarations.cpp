@@ -302,17 +302,9 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
         }}
 
     if (cls->methods) {
-        int constructorCount = 0;
         int destructorCount = 0;
         for (auto& m : cls->methods->methods) {
             auto* f = static_cast<FunctionDefNode*>(m.get());
-            if (f->isConstructor) {
-                constructorCount++;
-                if (constructorCount > 1) {
-                    std::cerr <<"Bery:Error [Line " << f->line <<"]: Class '" << cls->name<<"' already has a constructor - only one constructor is supported\n";
-                    errors = true;
-                }
-            }
             if (f->isDestructor) {
                 destructorCount++;
                 if (destructorCount > 1) {
@@ -352,13 +344,14 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
                     break; 
                 }
             } 
-            if(dupeoverload && !func->isConstructor && !func->isDestructor){
+            if(dupeoverload && !func->isDestructor){
                 std::cerr << "Bery:Error [Line " << func->line << "]: Function '" << func->name <<"' is already defined with same parameter types.\n";
                 errors = true;
                     
             }
             moverload.push_back(sig);
             currentFunctionReturnType = func->returnType;
+            currentFunctionIsConstructor = func->isConstructor;
             symbolTable.pushScope();
             if (cls->attributes) {
                 symbolTable.addVariable(cls->attributes->selfRef, cls->name, false, true, cls->line);
@@ -384,6 +377,7 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
 
             symbolTable.popScope();
             currentFunctionReturnType = "";
+            currentFunctionIsConstructor = false;
         }
         currentClassContext = "";
     }

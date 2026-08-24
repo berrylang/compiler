@@ -21,6 +21,10 @@ void CodeGen::genClassDecl(ASTNode* node) {
         layout.fields = parentLayout.fields;
         layout.fieldIndex = parentLayout.fieldIndex;
         layout.fieldInitializers = parentLayout.fieldInitializers;
+        layout.hasConstructor = parentLayout.hasConstructor;
+        layout.constructorOwner = parentLayout.constructorOwner;
+        layout.hasDestructor = parentLayout.hasDestructor;
+        layout.destructorOwner = parentLayout.destructorOwner;
         for (auto* declNode : parentLayout.fieldInitializers) {
             if (declNode->type == NodeType::VAR_DECL) {
                 fieldTypes.push_back(llvmType(static_cast<VarDeclNode*>(declNode)->varType));
@@ -69,8 +73,8 @@ void CodeGen::genClassDecl(ASTNode* node) {
     if (cls->methods) {
         for (auto& m : cls->methods->methods) {
             auto* f = static_cast<FunctionDefNode*>(m.get());
-            if (f->isConstructor) layout.hasConstructor = true;
-            if (f->isDestructor) layout.hasDestructor = true;
+            if (f->isConstructor) { layout.hasConstructor = true; layout.constructorOwner = cls->name; }
+            if (f->isDestructor)  { layout.hasDestructor  = true; layout.destructorOwner  = cls->name; }
         }
     }
     classLayouts[cls->name] = layout;
@@ -80,7 +84,7 @@ void CodeGen::genClassDecl(ASTNode* node) {
             std::vector<std::string> beryParamTypes;
             for (auto& p : func->parameters) beryParamTypes.push_back(p.first);
             std::string mangledName = func->isConstructor ? 
-                llvm.__mangleConstructor(cls->name) : func->isDestructor ? 
+                llvm.__mangleOverload(llvm.__mangleConstructor(cls->name), beryParamTypes) : func->isDestructor ? 
                 llvm.__mangleDestructor(cls->name) : llvm.__mangleOverload(llvm.__mangleMethod(cls->name, func->name), beryParamTypes);
 
             CodeGenFunctionSignature signature;
