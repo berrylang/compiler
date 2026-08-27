@@ -155,6 +155,109 @@ std::string CodeGen::genUnaryExpr(ASTNode* node, const std::string& expectedType
         return llvm.__emitBinaryOp("^", lt, false, opReg, "-1", outputStream);
     }
 
+    if (unary->optr == "delete") {
+        llvm.__declareExternFn("void", "bery_object_destroy", {"i8*"});
+
+        if (unary->operand->type == NodeType::CALL_EXPR) {
+            std::string retType = unary->operand->resolvedType;
+            std::string objReg = genCallExpr(unary->operand.get(), outputStream);
+            std::string castReg = llvm.__emitBitcast(llvmType(retType), objReg, "i8*", outputStream);
+            llvm.__emitCall("void", "bery_object_destroy", {{"i8*", castReg}}, outputStream);
+            return "0";
+        }
+
+        if (unary->operand->type == NodeType::INDEX_EXPR) {
+            auto* idxNode = static_cast<IndexExprNode*>(unary->operand.get());
+            std::string elemType = unary->operand->resolvedType;
+            std::string elt = llvmType(elemType);
+
+            std::string arrBaseType, arrBaseReg, arrAllocType;
+            size_t dot = idxNode->name.find('.');
+            if (dot != std::string::npos) {
+                std::vector<std::string> parts = splitDots(idxNode->name);
+                std::vector<std::string> headParts(parts.begin(), parts.end() - 1);
+                std::string chainType;
+                std::string chainPtr = genFieldChainAddressing(headParts, outputStream, chainType);
+                ClassLayout& layout = classLayouts.at(chainType);
+                int fieldIdx = layout.fieldIndex.at(parts.back());
+
+                std::string objReg = llvm.__emitLoad(llvm.__pointerType(layout.llvmStructType), chainPtr, outputStream);
+                arrBaseReg = llvm.__emitFieldGEP(layout.llvmStructType, objReg, fieldIdx, outputStream);
+                arrBaseType = layout.fields[fieldIdx].first;
+
+                ASTNode* fieldDecl = layout.fieldInitializers[fieldIdx];
+                if (fieldDecl->type == NodeType::ARRAY_DECL) {
+                    auto* arrDecl = static_cast<ArrayDeclNode*>(fieldDecl);
+                    bool isDynamic = (arrDecl->dimensions.size() == 1 && arrDecl->dimensions[0] == -1);
+                    arrAllocType = isDynamic ? "i8*" : llvm.__nestedArrayType(llvmType(arrDecl->elementType), arrDecl->dimensions);
+                } else {
+                    arrAllocType = llvmType(arrBaseType);
+                }
+            } else {
+                Symbol& sym = symbolTable.get(idxNode->name);
+                arrBaseType = sym.type;
+                arrBaseReg = sym.llvmRegister;
+                arrAllocType = sym.llvmAllocType;
+            }
+
+            bool isDynamic = (arrAllocType == "i8*");
+
+            if (isDynamic) {
+                llvm.__declareExternFn("i8*", "bery_array_get", {"i8*", "i64"});
+                std::string arrReg = llvm.__emitLoad("i8*", arrBaseReg, outputStream);
+                std::string idxReg = genExpression(idxNode->indices[0].get(), "int", outputStream);
+                std::string idxExt = llvm.__emitSext("i32", idxReg, "i64", outputStream);
+                std::string rawReg = llvm.__emitCall("i8*", "bery_array_get", {{"i8*", arrReg}, {"i64", idxExt}}, outputStream);
+                std::string objReg = llvm.__emitBitcast("i8*", rawReg, elt, outputStream);
+                std::string castReg = llvm.__emitBitcast(elt, objReg, "i8*", outputStream);
+                llvm.__emitCall("void", "bery_object_destroy", {{"i8*", castReg}}, outputStream);
+
+                llvm.__declareExternFn("void", "bery_array_set", {"i8*", "i64", "i8*"});
+                std::string nullBoxed = llvm.__emitBoxValue(elt, "null", outputStream);
+                llvm.__emitCall("void", "bery_array_set", {{"i8*", arrReg}, {"i64", idxExt}, {"i8*", nullBoxed}}, outputStream);
+            } else {
+                std::vector<std::pair<std::string, std::string>> indices;
+                indices.push_back({"i32", "0"});
+                for (auto& i : idxNode->indices)
+                    indices.push_back({"i32", genExpression(i.get(), "int", outputStream)});
+                std::string memPtr = llvm.__emitTypedGEP(arrAllocType, arrBaseReg, indices, false, outputStream);
+
+                std::string objReg = llvm.__emitLoad(elt, memPtr, outputStream);
+                std::string castReg = llvm.__emitBitcast(elt, objReg, "i8*", outputStream);
+                llvm.__emitCall("void", "bery_object_destroy", {{"i8*", castReg}}, outputStream);
+                llvm.__emitStore(elt, "null", memPtr, outputStream);
+            }
+            return "0";
+        }
+
+        auto* ident = static_cast<IdentNode*>(unary->operand.get());
+        size_t dot = ident->name.find('.');
+        if (dot != std::string::npos) {
+            std::vector<std::string> parts = splitDots(ident->name);
+            std::vector<std::string> headParts(parts.begin(), parts.end() - 1);
+            std::string chainType;
+            std::string chainPtr = genFieldChainAddressing(headParts, outputStream, chainType);
+            ClassLayout& layout = classLayouts.at(chainType);
+            int fieldIdx = layout.fieldIndex.at(parts.back());
+            std::string objReg = llvm.__emitLoad(llvm.__pointerType(layout.llvmStructType), chainPtr, outputStream);
+            std::string memPtr = llvm.__emitFieldGEP(layout.llvmStructType, objReg, fieldIdx, outputStream);
+
+            std::string castReg = llvm.__emitBitcast(llvm.__pointerType(layout.llvmStructType), objReg, "i8*", outputStream);
+            llvm.__emitCall("void", "bery_object_destroy", {{"i8*", castReg}}, outputStream);
+
+            llvm.__emitStore(llvmType(layout.fields[fieldIdx].first), "null", memPtr, outputStream);
+        } else {
+            Symbol& sym = symbolTable.get(ident->name);
+            std::string objReg = llvm.__emitLoad(llvmType(sym.type), sym.llvmRegister, outputStream);
+
+            std::string castReg = llvm.__emitBitcast(llvmType(sym.type), objReg, "i8*", outputStream);
+            llvm.__emitCall("void", "bery_object_destroy", {{"i8*", castReg}}, outputStream);
+
+            llvm.__emitStore(llvmType(sym.type), "null", sym.llvmRegister, outputStream);
+        }
+        return "0";
+    }
+
     bool isIncrement = (unary->optr == "++" || unary->optr == "post++");
     bool isPost = (unary->optr == "post++" || unary->optr == "post--");
     auto stepAt = [&](std::string memPtr, std::string valueType) -> std::string {

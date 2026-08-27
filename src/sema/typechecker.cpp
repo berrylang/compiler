@@ -206,59 +206,51 @@ std::string TypeChecker::checkUnaryExpr(ASTNode* node) {
     auto* unary = static_cast<UnaryExprNode*>(node);
 
     if(unary->optr == "delete"){
-        
-        auto fail = [&](const char* message){
-            std::cerr << "Bery:Error [Line " << unary->line << "]: " << message << "\n";
+
+        std::string objectType;
+
+        if (unary->operand->type == NodeType::CALL_EXPR) {
+            objectType = checkCallExpr(unary->operand.get());
+        }
+        else if (unary->operand->type == NodeType::INDEX_EXPR) {
+            objectType = checkIndexExpr(unary->operand.get());
+        }
+        else if (unary->operand->type == NodeType::IDENT) {
+            auto* ident = static_cast<IdentNode*>(unary->operand.get());
+            size_t dot = ident->name.find('.');
+
+            if(dot != std::string::npos){
+                std::vector<std::string> parts = splitDots(ident->name);
+                std::vector<std::string> headParts(parts.begin(), parts.end() - 1);
+                std::string containerType = resolveChainType(headParts, unary->line);
+
+                if(containerType == "unknown")return unary->resolvedType = "unknown";
+
+                auto classIt = classes.find(containerType);
+                if(classIt == classes.end()) std::cerr << "Bery:Error [Line " << unary->line << "]: " << "delete target is not an object" << "\n";
+
+                ASTNode* field = findField(classIt->second, parts.back());
+                if(!field) std::cerr << "Bery:Error [Line " << unary->line << "]: " << "delete target member does not exist" << "\n";
+                AccessSpecifier access = (field->type == NodeType::VAR_DECL)? static_cast<VarDeclNode*>(field)->access : static_cast<ArrayDeclNode*>(field)->access;
+                if(!checkMemberAccess(access, containerType, parts.back(), "field", unary->line)) return unary->resolvedType = "unknown";
+
+                if(field->type == NodeType::VAR_DECL && static_cast<VarDeclNode*>(field)->isConst) std::cerr << "Bery:Error [Line " << unary->line << "]: " << "Cannot delete const object field" << "\n";
+                objectType = resolveChainType(parts, unary->line);
+                if(objectType == "unknown") return unary->resolvedType = "unknown";
+            }
+            else{
+                if(!symbolTable.exists(ident->name)) std::cerr << "Bery:Error [Line " << unary->line << "]: " << "Undefined object variable" << "\n";
+                Symbol& symbol = symbolTable.get(ident->name);
+                if(symbol.isConst) std::cerr << "Bery:Error [Line " << unary->line << "]: " << "Cannot delete const object variable" << "\n";
+
+                objectType = symbol.type;
+            }
+        }
+        else {
+            std::cerr << "Bery:Error [Line " << unary->line << "]: " << "delete requires an object target" << "\n";
             errors = true;
             unary->resolvedType = "unknown";
             return unary->resolvedType;
-        };
-
-        if(unary->operand->type != NodeType::IDENT)
-            std::cerr << "Bery:Error [Line " << unary->line << "]: " << "delete requires an object target" << "\n";
-
-        auto* ident = static_cast<IdentNode*>(unary->operand.get());
-        std::string objectType;
-
-        size_t dot = ident->name.find('.');
-        if(dot != std::string::npos){
-            std::vector<std::string> parts = splitDots(ident->name);
-            std::vector<std::string> headParts(parts.begin(), parts.end() - 1);
-            std::string containerType = resolveChainType(headParts, unary->line);
-
-            if(containerType == "unknown") 
-                return unary->resolvedType = "unknown";
-
-            auto classIt = classes.find(containerType);
-            if(classIt == classes.end())
-                std::cerr << "Bery:Error [Line " << unary->line << "]: " << "delete target is not an object" << "\n";
-
-            ASTNode* field = findField(classIt->second, parts.back());
-            if(!field) 
-                std::cerr << "Bery:Error [Line " << unary->line << "]: " << "delete target member does not exist" << "\n";
-
-            AccessSpecifier access = (field->type == NodeType::VAR_DECL)
-                ? static_cast<VarDeclNode*>(field)->access
-                : static_cast<ArrayDeclNode*>(field)->access;
-            if(!checkMemberAccess(access, containerType, parts.back(), "field", unary->line))
-                return unary->resolvedType = "unknown";
-
-            if(field->type == NodeType::VAR_DECL && static_cast<VarDeclNode*>(field)->isConst)
-                std::cerr << "Bery:Error [Line " << unary->line << "]: " << "Cannot delete const object field" << "\n";
-
-            objectType = resolveChainType(parts, unary->line);
-            if(objectType == "unknown") 
-                return unary->resolvedType = "unknown";
-        }
-        else{
-            if(!symbolTable.exists(ident->name))
-                std::cerr << "Bery:Error [Line " << unary->line << "]: " << "Undefined object variable" << "\n";
-
-            Symbol& symbol = symbolTable.get(ident->name);
-            if(symbol.isConst)
-                std::cerr << "Bery:Error [Line " << unary->line << "]: " << "Cannot delete const object variable" << "\n";
-
-            objectType = symbol.type;
         }
 
         if(!classes.count(objectType))
@@ -267,7 +259,6 @@ std::string TypeChecker::checkUnaryExpr(ASTNode* node) {
         unary->resolvedType = "void";
         return unary->resolvedType;
     }
-
     std::string optype = analyzeExpression(unary->operand.get());
     if(unary->optr=="++"||unary->optr=="--"||unary->optr=="post++"||unary->optr=="post--"){
         if(unary->operand->type != NodeType::IDENT && unary->operand->type != NodeType::INDEX_EXPR){
