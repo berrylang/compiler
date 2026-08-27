@@ -91,3 +91,4 @@ TOKEN_RUN               run
 TOKEN_IMPORT            import
 TOKEN_EXTERN            extern
 TOKEN_CONST             const
+TOKEN_DELETE            delete

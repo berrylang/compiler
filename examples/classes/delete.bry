@@ -1,0 +1,27 @@
+
+
+class A {
+    attributes[p]::
+        int a;
+    
+    methods::
+        A(int a) {
+            p.a = a;
+        }
+
+        ~A() {
+            println("Ended " + p.a);
+        }
+}
+
+run {
+    A obj = new A(1);
+    delete obj;
+
+    println("Done Delete");
+
+    A obj1[2] = {new A(2), new A(3)};
+
+    delete obj1[1]; 
+    println("Done deleting the Array Object");
+}
