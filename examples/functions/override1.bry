@@ -1,0 +1,18 @@
+class A {
+    attributes[this]::
+    methods::
+
+    public func display() -> string {
+        return "pappaji";
+    }
+}
+
+class B : A {
+    attributes[that]::
+    methods::
+}
+
+run {
+    B obj = new B();
+    println(obj.display());
+}
