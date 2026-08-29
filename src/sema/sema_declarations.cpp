@@ -337,6 +337,21 @@ void SemanticAnalyzer::analyzeClassDecl(ASTNode* node) {
             for (auto& p : func->parameters) sig.parameterTypes.push_back(p.first);
             std::string methodName = cls->name +"."+func->name;
             std::vector<FunctionSignature>& moverload = functions[methodName];
+            if(!cls->parentName.empty()){
+                std::string parentMethodName = cls->parentName + "." + func->name;
+                auto parentFunc = functions.find(parentMethodName);
+                if(parentFunc != functions.end()){
+                    for(const auto& parentFuncSig : parentFunc->second){
+                        if(parentFuncSig.parameterTypes == sig.parameterTypes){
+                            if(parentFuncSig.returnType != sig.returnType){
+                                std::cerr << "Bery:Error [Line " << func->line << "]: Method '"<<func->name << "' overrides parent method with diff return type. \n";
+                                errors = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
             bool dupeoverload = false;
              for(auto& existing : moverload){
                 if(existing.parameterTypes == sig.parameterTypes){

@@ -68,6 +68,8 @@ private:
     bool& inConstructor;
     ASTNode* findField(ClassDefNode* cls, const std::string& fieldName);
     std::vector <FunctionDefNode*> findMethod(ClassDefNode* cls, const std::string& methodName);
+    std::vector<FunctionDefNode*> getInheritedMethods(ClassDefNode* cls, const std::string& methodName);
+    bool sameMethodSignature(FunctionDefNode* a, FunctionDefNode* b);
     std::vector<FunctionDefNode*> findConstructors(ClassDefNode* cls);
     FunctionDefNode* resolveMethodOverload(const std::vector<FunctionDefNode*>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line);
     const FunctionSignature* resolveFunctionOverload(const std::vector<FunctionSignature>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line);

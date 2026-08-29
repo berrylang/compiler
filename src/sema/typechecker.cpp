@@ -376,7 +376,7 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
         auto classIt = classes.find(objType);
         if (classIt != classes.end()) {
             ClassDefNode* cls = classIt->second;
-            std::vector<FunctionDefNode*> candidateMethod = findMethod(cls, method);
+            std::vector<FunctionDefNode*> candidateMethod = getInheritedMethods(cls, method);
             if(candidateMethod.empty()){
                 std::cerr <<"Bery:Error [Line " << call->line <<"]: Class '" << objType <<"' has no method '" << method <<"'\n";
                 errors = true;
@@ -412,7 +412,7 @@ std::string TypeChecker::checkCallExpr(ASTNode* node) {
     if (!currentClass.empty()) {
         auto selfClassIt =classes.find(currentClass);
         if (selfClassIt != classes.end()) {
-            std::vector<FunctionDefNode*> candidateFunction = findMethod(selfClassIt->second, call->callee);
+            std::vector<FunctionDefNode*> candidateFunction = getInheritedMethods(selfClassIt->second, call->callee);
             if(!candidateFunction.empty()){
                 std::vector<std::string> argumentTypesName;
                 for(auto& argsss : call->arguments){
@@ -826,7 +826,7 @@ std::string TypeChecker::checkSuperCall(ASTNode* node) {
     }
 
     std::string method = call->callee.substr(6);
-    std::vector<FunctionDefNode*> candidates = findMethod(classes.at(parentName), method);
+    std::vector<FunctionDefNode*> candidates = getInheritedMethods(classes.at(parentName), method);
     if (candidates.empty()) {
         std::cerr << "Bery:Error [Line " << call->line << "]: No method '" << method << "' found in parent chain of '" << currentClass << "'\n";
         errors = true;
@@ -906,6 +906,66 @@ std::vector<FunctionDefNode*> TypeChecker::findMethod(ClassDefNode* cls, const s
         if (it != classes.end()) return findMethod(it->second, methodName);
     }
     return foundMethod;
+}
+
+bool TypeChecker::sameMethodSignature(FunctionDefNode* a,FunctionDefNode* b) {
+    if (a==nullptr || b== nullptr) {
+        return false;
+    }
+    if (a->name != b->name) {
+        return false;
+    }
+    if (a->parameters.size() != b->parameters.size()) {
+        return false;
+    }
+    for (size_t i=0; i < a->parameters.size(); ++i) {
+        if (a->parameters[i].first != b->parameters[i].first) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<FunctionDefNode*> TypeChecker::getInheritedMethods(ClassDefNode* cls,const std::string& methodName) {
+    std::vector<FunctionDefNode*> result;
+    if (cls == nullptr) {
+        return result;
+    }
+    std::vector<FunctionDefNode*> currentMethods;
+    if (cls->methods) {
+        for (auto& m : cls->methods->methods) {
+            auto* f = static_cast<FunctionDefNode*>(m.get());
+            if (f->isConstructor || f->isDestructor) {
+                continue;
+            }
+            if (f->name == methodName) {
+                currentMethods.push_back(f);
+                result.push_back(f);
+            }
+        }
+    }
+    if (cls->parentName.empty()) {
+        return result;
+    }
+    auto parentIt = classes.find(cls->parentName);
+    if (parentIt == classes.end()) {
+        return result;
+    }
+    ClassDefNode* parent = parentIt->second;
+    std::vector<FunctionDefNode*> parentMethods =getInheritedMethods(parent, methodName);
+    for (auto* parentMethod : parentMethods) {
+        bool overridden = false;
+        for (auto* currentMethod : currentMethods) {
+            if (sameMethodSignature(currentMethod, parentMethod)) {
+                overridden = true;
+                break;
+            }
+        }
+        if (!overridden) {
+            result.push_back(parentMethod);
+        }
+    }
+    return result;
 }
 
 FunctionDefNode* TypeChecker::resolveMethodOverload(const std::vector<FunctionDefNode*>& candidate, const std::vector<std::string>& argTypes, const std::string& label, int line){
