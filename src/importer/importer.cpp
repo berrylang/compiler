@@ -25,14 +25,14 @@
 #include <fstream>
 #include <sstream>
 
-void Importer::resolveImports(ProgramNode* mainProgram, const std::string& basePath) {
+void Importer::resolveImports(ProgramNode* mainProgram, const std::string& basePath, DiagnosticEngine& diag) {
     std::vector<std::unique_ptr<ASTNode>> newGlobals;
     
     for (auto& node : mainProgram->globals) {
         if (node->type == NodeType::IMPORT_STMT) {
             auto* imp = static_cast<ImportNode*>(node.get());
             std::string fullPath = basePath + imp->path; 
-            loadModule(imp->moduleName, fullPath, basePath, newGlobals);
+            loadModule(imp->moduleName, fullPath, basePath, newGlobals, diag);
         } else {
             newGlobals.push_back(std::move(node));
         }
@@ -40,7 +40,7 @@ void Importer::resolveImports(ProgramNode* mainProgram, const std::string& baseP
     mainProgram->globals = std::move(newGlobals);
 }
 
-void Importer::loadModule(const std::string& modName, const std::string& fullPath, const std::string& basePath, std::vector<std::unique_ptr<ASTNode>>& outGlobals) {
+void Importer::loadModule(const std::string& modName, const std::string& fullPath, const std::string& basePath, std::vector<std::unique_ptr<ASTNode>>& outGlobals, DiagnosticEngine& diag) {
     if (importedFiles.count(fullPath)) return; 
     importedFiles.insert(fullPath);
     std::ifstream file(fullPath);
@@ -50,7 +50,7 @@ void Importer::loadModule(const std::string& modName, const std::string& fullPat
     }
     std::stringstream buffer;
     buffer << file.rdbuf();
-    Lexer lexer(buffer.str());
+    Lexer lexer(buffer.str(), diag);
     auto tokens = lexer.tokanize();
     Parser parser(tokens);
     auto ast = parser.parse();
@@ -66,7 +66,7 @@ void Importer::loadModule(const std::string& modName, const std::string& fullPat
         if (node->type == NodeType::IMPORT_STMT) {
             auto* imp = static_cast<ImportNode*>(node.get());
             std::string nextFullPath = basePath + imp->path;
-            loadModule(imp->moduleName, nextFullPath, basePath, processedGlobals);
+            loadModule(imp->moduleName, nextFullPath, basePath, processedGlobals, diag);
         } else {
             processedGlobals.push_back(std::move(node));
         }

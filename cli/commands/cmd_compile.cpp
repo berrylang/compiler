@@ -6,10 +6,12 @@
 #include "../../src/sema/sema.h"
 #include "../../src/codegen/codegen.h"
 #include "../../src/importer/importer.h"
+#include "../../src/diagnostic/diagnostic_engine.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <filesystem>
 
 
 static std::string stemOf(const std::string& path) {
@@ -63,20 +65,23 @@ static int runFrontend(const std::string& sourcePath,   const std::string& irPat
     std::stringstream buf;
     buf << file.rdbuf();
     std::string source = buf.str();
+    std::string absPath = std::filesystem::absolute(sourcePath).lexically_normal().string();
+    DiagnosticEngine diag(source, absPath);
 
-    Lexer lexer(source);
+    Lexer lexer(source, diag);
     auto tokens = lexer.tokanize();
 
     Parser parser(tokens);
     auto ast = parser.parse();
 
-    if (lexer.hasErrors() || parser.hasErrors()) {
+    diag.printAll();
+    if (diag.hasErrors() || parser.hasErrors()) {
         std::cerr <<"Bery: Compilation halted due to syntax errors.\n";
         return 5;
     }
 
     Importer importer;
-    importer.resolveImports(static_cast<ProgramNode*>(ast.get()), basePath);
+    importer.resolveImports(static_cast<ProgramNode*>(ast.get()), basePath, diag);
 
     SemanticAnalyzer sema(ast.get());
     sema.analyze();

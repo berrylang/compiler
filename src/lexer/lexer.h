@@ -12,6 +12,7 @@ it contains every helper functions which eventually helps the 'tokanize()' metho
 #include <string>
 #include <vector>
 #include "token.h"
+#include "../diagnostic/diagnostic_engine.h"
 
 class Lexer {
 
@@ -35,21 +36,27 @@ class Lexer {
     
     */
 public:
-    Lexer(const std::string& source);
+    Lexer(const std::string& source, DiagnosticEngine& diag);
     std::vector<Token> tokanize();
 
-    // @todo : change it to the Error Handler after it's implementation as independent unit of compiler.
-    bool hasErrors();
+
+    // removed it. but let it be here for now -
+    // bool hasErrors();
 
 private:
     // @tokens data
-    // @todo : add columns inside the token, after error reporter is fully built
     std::string source;
     int current;
     int line;
-    bool errors;
+    int col;
+    int startColumn;
+    int startLine;
+    // bool errors;
     std::vector<Token> tokens;
+    DiagnosticEngine& diag;
 
+    void emit(TokenType type, const std::string& lexeme);
+    void bumpLine();
     // @pointers inside the source
     char advance();
     char peek();
