@@ -75,20 +75,24 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"super", TokenType::TOKEN_SUPER},
 };
 
-Lexer::Lexer(const std::string& source) : source(source), current(0), line(1), errors(false) {}
+Lexer::Lexer(const std::string& source, DiagnosticEngine& diag)
+    : source(source), current(0), line(1), col(1), startColumn(1), startLine(1), diag(diag) {}
+
 
 std::vector<Token> Lexer::tokanize() {
     while (!isAtEnd()) {
         skipWhitespaces();
         if (!isAtEnd()) scanToken();
     }
-    tokens.push_back({TokenType::TOKEN_EOF, "", line});
+    tokens.push_back({TokenType::TOKEN_EOF, "", line, col});
 
     // it goes to parser next. vector of tokens.
     return tokens;
 }
 
 void Lexer::scanToken() {
+    startColumn = col;
+    startLine = line;
     char c = advance();
 
     if (isAlpha(c)) {
@@ -110,7 +114,7 @@ void Lexer::scanToken() {
             tokens.push_back({TokenType::TOKEN_EQUAL, "=", line});
             return;
         case ';': 
-            tokens.push_back({TokenType::TOKEN_SEMICOLON, ";", line});
+            emit(TokenType::TOKEN_SEMICOLON, ";");
             return;
         case '{':
             tokens.push_back({TokenType::TOKEN_LBRACE, "{", line});
@@ -412,11 +416,8 @@ void Lexer::scanCharLit() {
         @todo : Changed it to the UTF-8 encoding.
     
     */
-    if (errors) return; 
-
     if (peek() == '\'') { 
-        errors = true;
-        std::cerr <<"Bery:Error [Line "<< line <<"]: Empty Char Literal\n";
+        diag.report("ERROR009", startLine, startColumn, "'");
         advance(); 
         return;
     }
@@ -426,8 +427,7 @@ void Lexer::scanCharLit() {
     if (peek() == '\\') { 
         advance(); 
         if (isAtEnd() || peek() == '\'') { 
-            errors = true;
-            std::cerr <<"Bery:Error [Line " << line <<"]: Incomplete Escape Sequence\n";
+            diag.report("ERROR010", startLine, startColumn, "\\");
             return;
         }
 
@@ -444,16 +444,14 @@ void Lexer::scanCharLit() {
             case '"':  value = '\"'; return;
             case '\'': value = '\''; return;
             default:
-                errors = true;
-                std::cerr <<"Bery:Error [Line " << line <<"]: Invalid Escape Sequence\n";
+                diag.report("ERROR011", startLine, startColumn, std::string(1, es));
                 return;
         }
     } 
     
     else {
         if (peek() == '\n' || peek() == '\r') {
-            errors = true;
-            std::cerr <<"Bery:Error [Line " << line <<"]: Newline in char literal\n";
+            diag.report("ERROR012", startLine, startColumn, "");
             return;
         }
         value = advance();
@@ -473,19 +471,18 @@ void Lexer::scanCharLit() {
         advance(); 
         foundClosingQuote = true;
     }
-    errors = true;
-
     if (foundClosingQuote) {
-        std::cerr <<"Bery:Error [Line " << line <<"]: Multi-character Char Literal\n";
+        diag.report("ERROR013", startLine, startColumn, "");
     } else {
-        std::cerr <<"Bery:Error [Line " << line <<"]: Unclosed Char Literal\n";
+        diag.report("ERROR014", startLine, startColumn, "");
     }
 }
+
 
 void Lexer::scanStringLit() {
     std::string value = "";
     while (!isAtEnd() && peek() != '"') {
-        if (peek() == '\n') line++;
+        if (peek() == '\n') bumpLine();
         if (peek() == '\\') {
             advance();
             if (isAtEnd()) return;
@@ -500,8 +497,7 @@ void Lexer::scanStringLit() {
                 case '"':  value += '\"'; return;
                 case '\'': value += '\''; return;
                 default:
-                    errors = true;
-                    std::cerr <<"Bery:Error [Line " << line <<"]: Invalid escape sequence in string\n";
+                    diag.report("ERROR015", startLine, startColumn, std::string(1, es));
                     value += es; 
                     return;
             }
@@ -510,13 +506,12 @@ void Lexer::scanStringLit() {
         }
     }
     if (isAtEnd()) {
-        errors = true;
-        std::cerr <<"Bery:Error [Line " << line <<"]: Unclosed string literal\n";
+        diag.report("ERROR016", startLine, startColumn, "");
         return;
     }
 
     advance(); 
-    tokens.push_back({TokenType::TOKEN_STRING_LIT, value, line});
+    tokens.push_back({TokenType::TOKEN_STRING_LIT, value, line, col});
 }
 void Lexer::scanIdentifierOrKeyword() {
     int start = current - 1;
@@ -529,11 +524,7 @@ void Lexer::scanIdentifierOrKeyword() {
 void Lexer::skipWhitespaces() {
     while (!isAtEnd()) {
         char c = peek();
-        if (c == ' ' || c == '\t' || c == '\r') advance();
-        else if (c == '\n') {
-            line++;
-            advance();
-        }
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') advance();
         else break;
     }
 }
@@ -549,11 +540,11 @@ void Lexer::skipComments(bool isMLC){
                     return;
                 }
             }
-            if(peek()=='\n'){line++;}
+            if(peek()=='\n'){bumpLine();}
             advance();
         }
-        errors=true;
-        std::cerr<<"Bery:Error [Line " << line <<"]: Unclosed Comments\n";
+        // errors=true;
+        diag.report("ERROR017", startLine, startColumn, "");
         
     }
     else{
@@ -580,7 +571,12 @@ bool Lexer::isAlpha(char c) {
 
 }
 bool Lexer::isDigit(char c) {return c >= '0' && c <= '9';}
-char Lexer::advance() {return source[current++];}
+char Lexer::advance() {
+    char c = source[current++];
+    if (c == '\n') bumpLine();
+    else col++;
+    return c;
+}
 char Lexer::peek() {return source[current];}
 char Lexer::peekNext() {
 
@@ -591,5 +587,13 @@ char Lexer::peekNext() {
     return '\0';
 }
 
-// @todo : change it later for better Errors;
-bool Lexer::hasErrors() {return errors;}
+// bool Lexer::hasErrors() {return errors;}
+
+void Lexer::emit(TokenType type, const std::string& lexeme) {
+    tokens.push_back({type, lexeme, line, startColumn});
+}
+
+void Lexer::bumpLine() {
+    line++;
+    col = 1;
+}

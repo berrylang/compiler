@@ -19,6 +19,7 @@ target_include_directories(bre PRIVATE src)
 
 add_executable(bery
     src/main.cpp
+    src/diagnostic/diagnostic_engine.cpp
     src/lexer/lexer.cpp
     src/parser/parser.cpp
     src/parser/parser_conditional.cpp
