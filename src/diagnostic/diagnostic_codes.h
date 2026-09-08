@@ -37,6 +37,7 @@ static const std::unordered_map<std::string, DiagnosticInfo> DiagnosticRegistry 
     // @PARSER ERRORS and WARNINGS
     { "ERROR001", { Severity::ERROR, "Expected ';' after {}", "put ';' symbol right after {}" } },
     { "ERROR002", { Severity::ERROR, "Expected '}' after {}", "add '}' to close {}" } },
+    
 
     // @SEMA ERRORS and WARNINGS
     { "ERROR003", { Severity::ERROR, "Undefined variable '{}'", "declare '{}' before using it" } },

@@ -15,8 +15,8 @@
 #include <stdexcept>
 #include <iostream>
 
-Parser::Parser(const std::vector<Token>& tokens)
-    : tokens(tokens), current(0), errors(false) {}
+Parser::Parser(const std::vector<Token>& tokens, DiagnosticEngine& diag)
+    : tokens(tokens), current(0), errors(false), diag(diag) {}
 
 std::unique_ptr<ASTNode> Parser::parse() {
     auto program = std::make_unique<ProgramNode>(); 
@@ -97,10 +97,10 @@ bool Parser::check(TokenType type) {
     return peek().type == type;
 }
 
-Token Parser::consume(TokenType type, const std::string& msg) {
+Token Parser::consume(TokenType type, const std::string& code, const std::string& context) {
     if (check(type)) return advance();
     errors = true;
-    std::cerr<<"Bery:Error [Line " << peek().line <<"]: " << msg <<"\n";
+    diag.report(code, peek().line, 1, peek().lexeme, context);
     throw ParseError();
 }
 
