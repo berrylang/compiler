@@ -14,21 +14,21 @@
 std::unique_ptr<ASTNode> Parser::parseBreakStmt() {
     int line = previous().line;
     advance();
-    consume(TokenType::TOKEN_SEMICOLON, "Expected ';' after 'break'");
+    consume(TokenType::TOKEN_SEMICOLON, "ERROR001", "break");
     return std::make_unique<BreakStmtNode>(line);
 }
 
 std::unique_ptr<ASTNode> Parser::parseContinueStmt() {
     int line = previous().line;
     advance();
-    consume(TokenType::TOKEN_SEMICOLON, "Expected ';' after 'continue'");
+    consume(TokenType::TOKEN_SEMICOLON, "ERROR001", "continue");
     return std::make_unique<ContinueStmtNode>(line);
 }
 
 std::unique_ptr<ASTNode> Parser::parsePassStmt() {
     int line = previous().line;
     advance();
-    consume(TokenType::TOKEN_SEMICOLON, "Expected ';' after 'pass'");
+    consume(TokenType::TOKEN_SEMICOLON, "ERROR001", "pass");
     return std::make_unique<PassStmtNode>(line);
 }
 

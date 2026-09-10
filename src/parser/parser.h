@@ -13,6 +13,7 @@ it contains every helper functions which eventually helps the 'parse()' method.
 #include "../lexer/token.h"
 #include "ast/classes.h"
 #include "ast/accessSpecifier.h"
+#include "../diagnostic/diagnostic_engine.h"
 #include <vector>
 #include <memory>
 #include <exception>
@@ -23,7 +24,7 @@ class ParseError : public std::exception {};
 
 class Parser {
 public:
-    Parser(const std::vector<Token>& tokens);
+    Parser(const std::vector<Token>& tokens, DiagnosticEngine& diag);
     std::unique_ptr<ASTNode> parse();
 
     // @todo : change it to the Error Handler after it's implementation as independent unit of compiler.
@@ -34,6 +35,7 @@ private:
     std::vector<Token> tokens;
     int current;
     bool errors;
+    DiagnosticEngine& diag;
 
     // @pointers inside the token list
     Token advance();
@@ -46,7 +48,7 @@ private:
     bool check(TokenType type);
 
     // @actively consume the required token; if absent throw error
-    Token consume(TokenType type, const std::string& msg);
+    Token consume(TokenType type, const std::string& code, const std::string& context = "");
     
     // @panic-mode recovery
     void synchronize();

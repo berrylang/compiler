@@ -52,7 +52,7 @@ void Importer::loadModule(const std::string& modName, const std::string& fullPat
     buffer << file.rdbuf();
     Lexer lexer(buffer.str(), diag);
     auto tokens = lexer.tokanize();
-    Parser parser(tokens);
+    Parser parser(tokens, diag);
     auto ast = parser.parse();
     auto* importedProg = static_cast<ProgramNode*>(ast.get());
 

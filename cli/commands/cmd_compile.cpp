@@ -71,7 +71,7 @@ static int runFrontend(const std::string& sourcePath,   const std::string& irPat
     Lexer lexer(source, diag);
     auto tokens = lexer.tokanize();
 
-    Parser parser(tokens);
+    Parser parser(tokens, diag);
     auto ast = parser.parse();
 
     diag.printAll();
